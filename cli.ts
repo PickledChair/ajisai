@@ -13,7 +13,6 @@ if (import.meta.main) {
       const lexer = new Lexer(source);
       const parser = new Parser(lexer);
       const ast = parser.parse();
-      semantAnalyze(ast);
       const analyzedAst = semantAnalyze(ast);
       const cSrc = codegen(analyzedAst);
 
