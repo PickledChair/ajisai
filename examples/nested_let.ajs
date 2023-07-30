@@ -1,0 +1,7 @@
+proc main() {
+    let a = 2,
+        b = let { 3 + a }
+    {
+        println_i32(let c = b * 3 { c + 10 })
+    }
+}

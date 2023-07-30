@@ -1,0 +1,18 @@
+proc add(a: i32, b: i32) -> i32 {
+    a + b
+}
+
+proc main() {
+    let
+        a =
+            let a = 1, b = 2 {
+                a + b
+            },
+        b =
+            let a = 3, b = 4 {
+                a + b
+            }
+    {
+        println_i32(add(a, b))
+    }
+}
