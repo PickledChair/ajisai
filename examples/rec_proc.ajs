@@ -1,9 +1,13 @@
-proc count(up: i32, down: i32) {
-    if (down <= 0) {
-        println_i32(up)
+proc factorial_inner(accum: i32, x: i32) -> i32 {
+    if (x <= 1) {
+        accum
     } else {
-        count(up + 1, down - 1)
+        factorial_inner(accum * x, x - 1)
     }
 }
 
-proc main() { count(0, 10) }
+proc factorial(x: i32) -> i32 {
+    factorial_inner(1, x)
+}
+
+proc main() { println_i32(factorial(10)) }
