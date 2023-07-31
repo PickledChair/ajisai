@@ -1,0 +1,9 @@
+proc count(up: i32, down: i32) {
+    if (down <= 0) {
+        println_i32(up)
+    } else {
+        count(up + 1, down - 1)
+    }
+}
+
+proc main() { count(0, 10) }

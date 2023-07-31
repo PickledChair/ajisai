@@ -67,7 +67,8 @@ const codegenDef = (ast: AstDefNode): { procDef: string, envStruct: string } => 
     const argInfos = [];
 
     let isVoidFunc = true;
-    if (procName !== "ajisai_main") {
+    const isMain = procName === "ajisai_main";
+    if (!isMain) {
       envStruct += `struct ${procEnvName} {\n  EnvHeader header;`;
       for (let i = 0; i < ast.declare.value.args.length; i++) {
         const { name: argName } = ast.declare.value.args[i];
@@ -108,7 +109,7 @@ const codegenDef = (ast: AstDefNode): { procDef: string, envStruct: string } => 
 
     procDef += ") {\n";
 
-    const { expr, prelude, envStruct: exprEnvStruct } = codegenExpr(ast.declare.value.body, 0);
+    const { expr, prelude, envStruct: exprEnvStruct } = codegenExpr(ast.declare.value.body, isMain ? -1 : ast.declare.value.envId);
     if (prelude) procDef += prelude;
 
     if (!isVoidFunc) procDef += `\n  env${ast.declare.value.envId}->result = ${expr};`;
@@ -170,8 +171,9 @@ const codegenExpr = (ast: AstNode, envId: number): { expr: string, prelude?: str
         }
         throw new Error(`there is not info about proc '${calleeExpr}'`);
       }
-      let prelude = `  struct Env${procInfo.envId} env${procInfo.envId} = `;
-      if (envId === 0) {
+      const calleeEnvName = `env${procInfo.envId}${procInfo.envId === envId ? "_" : ""}`;
+      let prelude = `  struct Env${procInfo.envId} ${calleeEnvName} = `;
+      if (envId === -1) {
         prelude += "{};";
       } else {
         prelude += `{ .header = { .parent = (EnvHeader *)&env${envId} } };`
@@ -180,18 +182,18 @@ const codegenExpr = (ast: AstNode, envId: number): { expr: string, prelude?: str
       for (let i = 0; i < ast.args.length; i++) {
         const { expr: argExpr, prelude: argPrelude, envStruct: argEnvStruct } = codegenExpr(ast.args[i], envId);
         if (argPrelude) prelude += "\n" + argPrelude;
-        prelude += `\n  env${procInfo.envId}.arg_${procInfo.argInfos[i].argName} = ${argExpr};`
+        prelude += `\n  ${calleeEnvName}.arg_${procInfo.argInfos[i].argName} = ${argExpr};`
         if (envStruct.length === 0) {
           if (argEnvStruct) envStruct += argEnvStruct;
         } else {
           if (argEnvStruct) envStruct += "\n\n" + argEnvStruct;
         }
       }
-      prelude += `\n  ${calleeExpr}(&env${procInfo.envId});`;
+      prelude += `\n  ${calleeExpr}(&${calleeEnvName});`;
       if (procInfo.returnCType === "void") {
         return { expr: "", prelude, envStruct: envStruct || undefined };
       } else {
-        return { expr: `env${procInfo.envId}.result`, prelude, envStruct: envStruct || undefined };
+        return { expr: `${calleeEnvName}.result`, prelude, envStruct: envStruct || undefined };
       }
     }
     case "integer":
@@ -231,7 +233,7 @@ const codegenLet = (ast: AstLetNode, parentEnvId: number): { expr: string, prelu
   let subEnvStruct = "";
   let envStruct = `struct Env${ast.envId} {\n  EnvHeader header;`;
   let prelude = `  struct Env${ast.envId} env${ast.envId} = `;
-  if (parentEnvId === 0) {
+  if (parentEnvId === -1) {
     prelude += "{};";
   } else {
     prelude += `{ .header = { .parent = (EnvHeader *)&env${parentEnvId} }};`;
