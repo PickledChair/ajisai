@@ -65,7 +65,7 @@ class ProcContext {
     this.#envStack.pop();
   }
 
-  currentEnvId(): number {
+  get currentEnvId(): number {
     return this.#envStack.at(-1)!.envId;
   }
 
@@ -77,7 +77,7 @@ class ProcContext {
     return this.#envStack.at(-1)!.isProcEnv;
   }
 
-  procEnvId(): number {
+  get procEnvId(): number {
     return this.#envStack.at(0)!.envId;
   }
 }
@@ -112,7 +112,7 @@ class ProcCodeGenerator {
     const procDeclInst = this.makeProcDeclInst();
 
     let bodyInsts: ACProcBodyInst[]  = [
-      { inst: "proc_env.init", envId: this.#procCtx.procEnvId() },
+      { inst: "proc_env.init", envId: this.#procCtx.procEnvId },
     ];
 
     const { prelude, valInst } = this.codegenExpr(this.#procNode.body, defTypeMap);
@@ -142,7 +142,7 @@ class ProcCodeGenerator {
           procName: procDeclInst.procName,
           args: procDeclInst.args,
           resultType: procDeclInst.resultType,
-          envId: this.#procCtx.procEnvId(),
+          envId: this.#procCtx.procEnvId,
           body: bodyInsts
         }
       ];
@@ -260,15 +260,19 @@ class ProcCodeGenerator {
       args.push(valInst!);
     }
 
-    prelude.length === 0 ? undefined : prelude
-
     if (ast.callee.nodeType === "variable") {
       const varTy = defTypeMap.get(ast.callee.name);
       if (varTy && varTy.tyKind === "proc") {
         if (varTy.procKind === "builtin") {
-          return { prelude, valInst: { inst: "builtin.call", callee: calleeValInst!, args } };
+          return {
+            prelude: prelude.length === 0 ? undefined : prelude,
+            valInst: { inst: "builtin.call", callee: calleeValInst!, args }
+          };
         } else if (varTy.procKind === "userdef") {
-          return { prelude, valInst: { inst: "proc.call", callee: calleeValInst!, parentEnvId: this.#procCtx.currentEnvId(), args } };
+          return {
+            prelude: prelude.length === 0 ? undefined : prelude,
+            valInst: { inst: "proc.call", callee: calleeValInst!, parentEnvId: this.#procCtx.currentEnvId, args }
+          };
         } else {
           throw new Error("unimplemented for other proc type");
         }
@@ -304,7 +308,7 @@ class ProcCodeGenerator {
 
   private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
     let prelude: ACProcBodyInst[] = [
-      { inst: "let_env.init", envId: ast.envId, parentEnvId: this.#procCtx.currentEnvId() }
+      { inst: "let_env.init", envId: ast.envId, parentEnvId: this.#procCtx.currentEnvId }
     ];
     this.#procCtx.enterScope(ast.envId);
 
@@ -330,7 +334,7 @@ class ProcCodeGenerator {
 
     if (!isUnitType) {
       prelude.push(
-        { inst: "proc_env.deftmp_noval", envId: this.#procCtx.procEnvId(), idx: resultTmpId, ty: ast.ty! }
+        { inst: "proc_env.deftmp_noval", envId: this.#procCtx.procEnvId, idx: resultTmpId, ty: ast.ty! }
       );
     }
 
@@ -350,10 +354,10 @@ class ProcCodeGenerator {
       if (elseValInst) elseInsts.push(elseValInst);
     } else {
       thenInsts.push(
-        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId(), idx: resultTmpId, value: thenValInst! }
+        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: thenValInst! }
       );
       elseInsts.push(
-        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId(), idx: resultTmpId, value: elseValInst! }
+        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: elseValInst! }
       );
     }
 
@@ -363,7 +367,7 @@ class ProcCodeGenerator {
 
     return {
       prelude,
-      valInst: isUnitType ? undefined : { inst: "proc_env.load_tmp", envId: this.#procCtx.procEnvId(), idx: resultTmpId }
+      valInst: isUnitType ? undefined : { inst: "proc_env.load_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId }
     }
   }
 }
