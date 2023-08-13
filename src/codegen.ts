@@ -1,316 +1,369 @@
-import { AstDefNode, AstIfNode, AstLetNode, AstModuleNode, AstNode } from "./ast.ts";
+import { ACEntryInst, ACModuleInst, ACProcBodyInst, ACProcDeclInst, ACProcDefInst, ACPushValInst } from "./acir.ts";
+import {
+  AstBinaryNode,
+  AstCallNode,
+  AstExprNode,
+  AstIfNode,
+  AstLetNode,
+  AstModuleNode,
+  AstProcNode,
+  AstUnaryNode,
+  AstVariableNode
+} from "./ast.ts";
+import { DefTypeMap } from "./semant.ts";
+import { PrimitiveType, ProcType, Type, tyEqual } from "./type.ts";
 
-let tmpVarId = 0;
+export class CodeGenerator {
+  #module: AstModuleNode;
+  #defTypeMap: DefTypeMap;
 
-type ProcInfo = { envId: number, returnCType: string, argInfos: { argName: string, argCType: string }[] };
-type ProcInfoMap = Map<string, ProcInfo>;
+  constructor(module: AstModuleNode, defTypeMap: DefTypeMap) {
+    this.#module = module;
+    this.#defTypeMap = defTypeMap;
+  }
 
-const procInfoMap: ProcInfoMap = new Map();
-const procEnvIds: number[] = [];
+  codegen(): ACModuleInst {
+    const procDecls = [];
+    const procDefs = [];
+    let entry = undefined;
 
-const defaultDeclares = `typedef struct EnvHeader EnvHeader;
-struct EnvHeader {
-  EnvHeader *parent;
-};
+    for (const def of this.#module.defs) {
+      if (def.declare.ty!.tyKind === "proc") {
+        const procCodeGen = new ProcCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstProcNode);
+        const [procDecl, procDef] = procCodeGen.codegen(this.#defTypeMap);
+        if (procDecl) procDecls.push(procDecl);
+        if (procDef.inst === "proc.def") {
+          procDefs.push(procDef);
+        } else if (procDef.inst === "entry") {
+          entry = procDef;
+        }
+      }
+    }
 
-void ajisai_println_i32(int32_t value) {
-  printf("%d\\n", value);
+    return { inst: "module", procDecls, procDefs, entry };
+  }
 }
 
-void ajisai_println_bool(bool value) {
-  printf("%s\\n", value ? "true" : "false");
-}`;
+type EnvContext = { envId: number, isProcEnv: boolean };
 
-export const codegen = (ast: AstModuleNode): string => {
-  let declares = defaultDeclares;
-  let procs = "";
+class ProcContext {
+  procName: string;
+  #envStack: EnvContext[];
+  #freshTmpId = 0;
 
-  for (const def of ast.defs) {
-    const { procDef, envStruct } = codegenDef(def);
-    declares += "\n\n" + envStruct;
-    procs += "\n\n" + procDef;
+  constructor(procName: string, envId: number) {
+    this.procName = procName;
+    this.#envStack = [];
+    this.#envStack.push({ envId, isProcEnv: true });
   }
 
-  return `#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
+  enterScope(envId: number) {
+    this.#envStack.push({ envId, isProcEnv: false });
+  }
 
-${declares}${procs}
+  leaveScope() {
+    this.#envStack.pop();
+  }
 
-int main() {
-  ajisai_main();
-  return 0;
+  currentEnvId(): number {
+    return this.#envStack.at(-1)!.envId;
+  }
+
+  get freshProcTmpId(): number {
+    return this.#freshTmpId++;
+  }
+
+  currentEnvIsProc(): boolean {
+    return this.#envStack.at(-1)!.isProcEnv;
+  }
+
+  procEnvId(): number {
+    return this.#envStack.at(0)!.envId;
+  }
 }
-`;
+
+const getExprType = (expr: AstExprNode): Type | undefined => {
+  switch (expr.nodeType) {
+    case "proc": return expr.bodyTy;
+    case "if": return expr.ty;
+    case "let": return expr.bodyTy;
+    case "call": return expr.ty;
+    case "binary": return expr.ty;
+    case "unary": return expr.ty;
+    case "bool": return { tyKind: "primitive", name: "bool" };
+    case "integer": return { tyKind: "primitive", name: "i32" };
+    case "variable": return expr.ty;
+    case "unit": return { tyKind: "primitive", name: "()" };
+  }
 };
 
-const codegenDef = (ast: AstDefNode): { procDef: string, envStruct: string } => {
-  if (ast.declare.value.nodeType !== "proc") {
-    throw new Error("unimplemented for global variable");
+class ProcCodeGenerator {
+  #procTy: ProcType;
+  #procNode: AstProcNode;
+  #procCtx: ProcContext;
+
+  constructor(procName: string, procTy: ProcType, proc: AstProcNode) {
+    this.#procTy = procTy;
+    this.#procNode = proc;
+    this.#procCtx = new ProcContext(procName, proc.envId);
   }
-  const defTy = ast.declare.ty!;
-  if (defTy.tyKind !== "proc") {
-    throw new Error("unimplemented for global variable");
+
+  codegen(defTypeMap: DefTypeMap): [ACProcDeclInst | undefined, ACProcDefInst | ACEntryInst] {
+    const procDeclInst = this.makeProcDeclInst();
+
+    let bodyInsts: ACProcBodyInst[]  = [
+      { inst: "proc_env.init", envId: this.#procCtx.procEnvId() },
+    ];
+
+    const { prelude, valInst } = this.codegenExpr(this.#procNode.body, defTypeMap);
+
+    if (prelude) {
+      bodyInsts = bodyInsts.concat(prelude);
+    }
+
+    if (valInst) {
+      if (tyEqual(procDeclInst.resultType, { tyKind: "primitive", name: "()" })) {
+        bodyInsts.push(valInst);
+      } else {
+        bodyInsts.push({ inst: "proc.return", value: valInst });
+      }
+    }
+
+    if (procDeclInst.procName === "main") {
+      return [
+        undefined,
+        { inst: "entry", body: bodyInsts }
+      ];
+    } else {
+      return [
+        procDeclInst,
+        {
+          inst: "proc.def",
+          procName: procDeclInst.procName,
+          args: procDeclInst.args,
+          resultType: procDeclInst.resultType,
+          envId: this.#procCtx.procEnvId(),
+          body: bodyInsts
+        }
+      ];
+    }
   }
 
-  const procName = getProcName(ast.declare.name);
-  let procDef = "";
+  private makeProcDeclInst(): ACProcDeclInst {
+    return {
+      inst: "proc.decl",
+      procName: this.#procCtx.procName,
+      args: this.#procNode.args.map(arg => [arg.name, arg.ty!]),
+      resultType: this.#procTy.bodyType
+    };
+  }
 
-  let envStruct = "";
+  private codegenExpr(ast: AstExprNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
+    switch (ast.nodeType) {
+      case "unary":
+        return this.codegenUnary(ast, defTypeMap);
+      case "binary":
+        return this.codegenBinary(ast, defTypeMap);
+      case "call":
+        return this.codegenCall(ast, defTypeMap);
+      case "let":
+        return this.codegenLet(ast, defTypeMap);
+      case "if":
+        return this.codegenIf(ast, defTypeMap);
+      case "integer":
+        return { valInst: { inst: "i32.const", value: ast.value } };
+      case "bool":
+        return { valInst: { inst: "bool.const", value: ast.value } };
+      case "unit":
+        return {};
+      case "variable":
+        return this.codegenVariable(ast, defTypeMap);
+      default:
+        throw new Error(`invalid expr node: ${ast.nodeType}`);
+    }
+  }
 
-  // TODO: builtin関数かどうかを調べる方法欲しい
-  if (procName.startsWith("userdef") || procName === "ajisai_main") {
-    if (procName.startsWith("userdef")) procEnvIds.push(ast.declare.value.envId);
-    procDef += `int ${procName}(`;
-    const procEnvName = `Env${ast.declare.value.envId}`;
+  private codegenUnary(ast: AstUnaryNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst: ACPushValInst } {
+    const { prelude: opePrelude, valInst: opeValInst } = this.codegenExpr(ast.operand, defTypeMap);
+    if (opeValInst) {
+      if (ast.operator === "-") {
+        return { prelude: opePrelude, valInst: { inst: "i32.neg", operand: opeValInst } };
+      }
+      if (ast.operator === "!") {
+        return { prelude: opePrelude, valInst: { inst: "bool.not", operand: opeValInst } };
+      }
+    }
+    throw new Error("invalid unary node");
+  }
 
-    const argInfos = [];
+  private codegenBinary(ast: AstBinaryNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst: ACPushValInst } {
+    const { prelude: leftPrelude, valInst: leftValInst } = this.codegenExpr(ast.left, defTypeMap);
+    const { prelude: rightPrelude, valInst: rightValInst } = this.codegenExpr(ast.right, defTypeMap);
 
-    let isVoidFunc = true;
-    const isMain = procName === "ajisai_main";
-    if (!isMain) {
-      envStruct += `struct ${procEnvName} {\n  EnvHeader header;`;
-      for (let i = 0; i < ast.declare.value.args.length; i++) {
-        const { name: argName } = ast.declare.value.args[i];
-        const argTy = defTy.argTypes[i];
-        let tyStr;
-        if (argTy.tyKind === "builtin") {
-          if (argTy.name === "i32") {
-            tyStr = "int32_t";
-          } else if (argTy.name === "bool") {
-            tyStr = "bool";
-          } else {
-            throw new Error("void type argument");
+    let prelude: ACProcBodyInst[] | undefined = undefined;
+    if (leftPrelude || rightPrelude) {
+      prelude = [];
+      if (leftPrelude) prelude = prelude.concat(leftPrelude);
+      if (rightPrelude) prelude = prelude.concat(rightPrelude);
+    }
+
+    if (tyEqual(ast.ty!, { tyKind: "primitive", name: "i32" })) {
+      switch (ast.operator) {
+        case "+": return { prelude, valInst: { inst: "i32.add", left: leftValInst!, right: rightValInst! } };
+        case "-": return { prelude, valInst: { inst: "i32.sub", left: leftValInst!, right: rightValInst! } };
+        case "*": return { prelude, valInst: { inst: "i32.mul", left: leftValInst!, right: rightValInst! } };
+        case "/": return { prelude, valInst: { inst: "i32.div", left: leftValInst!, right: rightValInst! } };
+      }
+    }
+
+    if (tyEqual(ast.ty!, { tyKind: "primitive", name: "bool" })) {
+      const boolType: PrimitiveType = { tyKind: "primitive", name: "bool" };
+      const i32Type: PrimitiveType = { tyKind: "primitive", name: "i32" };
+
+      const leftTy = getExprType(ast.left);
+      const rightTy = getExprType(ast.right);
+
+      if (tyEqual(leftTy!, boolType) && tyEqual(rightTy!, boolType)) {
+        switch (ast.operator) {
+          case "==": return { prelude, valInst: { inst: "bool.eq", left: leftValInst!, right: rightValInst! } };
+          case "!=": return { prelude, valInst: { inst: "bool.ne", left: leftValInst!, right: rightValInst! } };
+          case "&&": return { prelude, valInst: { inst: "bool.and", left: leftValInst!, right: rightValInst! } };
+          case "||": return { prelude, valInst: { inst: "bool.or", left: leftValInst!, right: rightValInst! } };
+        }
+      }
+
+      if (tyEqual(leftTy!, i32Type) && tyEqual(rightTy!, i32Type)) {
+        switch (ast.operator) {
+          case "==": return { prelude, valInst: { inst: "i32.eq", left: leftValInst!, right: rightValInst! } };
+          case "!=": return { prelude, valInst: { inst: "i32.ne", left: leftValInst!, right: rightValInst! } };
+          case "<": return { prelude, valInst: { inst: "i32.lt", left: leftValInst!, right: rightValInst! } };
+          case "<=": return { prelude, valInst: { inst: "i32.le", left: leftValInst!, right: rightValInst! } };
+          case ">": return { prelude, valInst: { inst: "i32.gt", left: leftValInst!, right: rightValInst! } };
+          case ">=": return { prelude, valInst: { inst: "i32.ge", left: leftValInst!, right: rightValInst! } };
+        }
+      }
+    }
+
+    throw new Error("unimplemented for other type");
+  }
+
+  private codegenCall(ast: AstCallNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst: ACPushValInst } {
+    let prelude: ACProcBodyInst[] = [];
+    const { prelude: calleePrelude, valInst: calleeValInst } = this.codegenExpr(ast.callee, defTypeMap);
+
+    if (calleePrelude) prelude = prelude.concat(calleePrelude);
+    const args = [];
+
+    for (const arg of ast.args) {
+      const { prelude: argPrelude, valInst } = this.codegenExpr(arg, defTypeMap);
+      if (argPrelude) prelude = prelude.concat(argPrelude);
+      args.push(valInst!);
+    }
+
+    prelude.length === 0 ? undefined : prelude
+
+    if (ast.callee.nodeType === "variable") {
+      const varTy = defTypeMap.get(ast.callee.name);
+      if (varTy && varTy.tyKind === "proc") {
+        if (varTy.procKind === "builtin") {
+          return { prelude, valInst: { inst: "builtin.call", callee: calleeValInst!, args } };
+        } else if (varTy.procKind === "userdef") {
+          return { prelude, valInst: { inst: "proc.call", callee: calleeValInst!, parentEnvId: this.#procCtx.currentEnvId(), args } };
+        } else {
+          throw new Error("unimplemented for other proc type");
+        }
+      } else {
+        throw new Error("unreachable");
+      }
+    } else {
+      throw new Error("unimplemented for calling proc literal directly");
+    }
+  }
+
+  private codegenVariable(ast: AstVariableNode, defTypeMap: DefTypeMap): { valInst: ACPushValInst } {
+    if (ast.level === -1) {
+      const varTy = defTypeMap.get(ast.name);
+      if (varTy) {
+        if (varTy.tyKind === "proc") {
+          if (varTy.procKind === "userdef") {
+            return { valInst: { inst: "mod_defs.load", varName: ast.name } };
+          } else if (varTy.procKind === "builtin" || varTy.procKind === "builtinWithEnv") {
+            return { valInst: { inst: "builtin.load", varName: ast.name } };
           }
+          throw new Error("unreachable");
         } else {
-          throw new Error("unimplemented for non-builtin type argument");
+          throw new Error("unimplemented for non-proc def load");
         }
-        argInfos.push({ argName, argCType: tyStr });
-        envStruct += `\n  ${tyStr} arg_${argName};`;
-      }
-      let returnCType = "void";
-
-      if (defTy.bodyType.tyKind === "builtin") {
-        if (defTy.bodyType.name === "i32") {
-          returnCType = "int32_t";
-          isVoidFunc = false;
-          envStruct += "\n  int32_t result;";
-        } else if (defTy.bodyType.name === "bool") {
-          returnCType = "bool";
-          isVoidFunc = false;
-          envStruct += "\n  bool result;";
-        }
-      }
-      procInfoMap.set(procName, { envId: ast.declare.value.envId, returnCType, argInfos });
-      envStruct += "\n};";
-
-      procDef += `struct ${procEnvName} *env${ast.declare.value.envId}`
-    }
-
-    procDef += ") {\n";
-
-    const { expr, prelude, envStruct: exprEnvStruct } = codegenExpr(ast.declare.value.body, isMain ? -1 : ast.declare.value.envId);
-    if (prelude) procDef += prelude;
-
-    if (!isVoidFunc) procDef += `\n  env${ast.declare.value.envId}->result = ${expr};`;
-    procDef += "\n  return 0;\n}";
-
-    if (exprEnvStruct) {
-      envStruct += `\n\n${exprEnvStruct}`;
-    }
-
-    return { procDef, envStruct };
-  } else {
-    throw new Error("define proc with builtin proc name");
-  }
-};
-
-const getProcName = (name: string): string => {
-  if (["main", "println_i32", "println_bool"].includes(name)) {
-    return `ajisai_${name}`;
-  } else {
-    return `userdef_${name}`;
-  }
-};
-
-const codegenExpr = (ast: AstNode, envId: number): { expr: string, prelude?: string, envStruct?: string } => {
-  switch (ast.nodeType) {
-    case "binary": {
-      let prelude = "";
-      let envStruct = "";
-
-      const { expr: leftExpr, prelude: leftPrelude, envStruct: leftEnvStruct } = codegenExpr(ast.left, envId);
-      if (leftPrelude) prelude += leftPrelude;
-      if (leftEnvStruct) envStruct += leftEnvStruct;
-
-      const { expr: rightExpr, prelude: rightPrelude, envStruct: rightEnvStruct } = codegenExpr(ast.right, envId);
-      if (rightPrelude) prelude += (prelude.length === 0 ? "" : "\n") + rightPrelude;
-      if (rightEnvStruct) envStruct += (envStruct.length === 0 ? "" : "\n\n") + rightEnvStruct;
-
-      return {
-        expr: `(${leftExpr} ${ast.operator} ${rightExpr})`,
-        prelude: (prelude.length !== 0) ? prelude : undefined,
-        envStruct: (envStruct.length !== 0) ? envStruct : undefined
-      };
-    }
-    case "unary": {
-      const { expr: operandExpr, prelude, envStruct } = codegenExpr(ast.operand, envId);
-      return { expr: `${ast.operator}${operandExpr}`, prelude, envStruct };
-    }
-    case "call": {
-      const { expr: calleeExpr, prelude: calleePrelude, envStruct: calleeEnvStruct } = codegenExpr(ast.callee, envId);
-      const procInfo = procInfoMap.get(calleeExpr);
-      if (!procInfo) {
-        if (calleeExpr === "ajisai_println_i32" || calleeExpr === "ajisai_println_bool") {
-          const { expr: argExpr, prelude: argPrelude, envStruct: argEnvStruct } = codegenExpr(ast.args[0], envId);
-          return {
-            expr: "",
-            prelude: ((calleePrelude ? calleePrelude + "\n" : "") + (argPrelude ? argPrelude : "")) + `\n  ${calleeExpr}(${argExpr});`,
-            envStruct: ((calleeEnvStruct ? calleeEnvStruct + "\n\n" : "") + (argEnvStruct ? argEnvStruct : "")) || undefined
-          };
-        }
-        throw new Error(`there is not info about proc '${calleeExpr}'`);
-      }
-      const calleeEnvName = `env${procInfo.envId}${procInfo.envId === envId ? "_" : ""}`;
-      let prelude = `  struct Env${procInfo.envId} ${calleeEnvName} = `;
-      if (envId === -1) {
-        prelude += "{};";
       } else {
-        prelude += `{ .header = { .parent = (EnvHeader *)&env${envId} } };`
+        throw new Error(`variable '${ast.name}' not found`);
       }
-      let envStruct = "";
-      for (let i = 0; i < ast.args.length; i++) {
-        const { expr: argExpr, prelude: argPrelude, envStruct: argEnvStruct } = codegenExpr(ast.args[i], envId);
-        if (argPrelude) prelude += "\n" + argPrelude;
-        prelude += `\n  ${calleeEnvName}.arg_${procInfo.argInfos[i].argName} = ${argExpr};`
-        if (envStruct.length === 0) {
-          if (argEnvStruct) envStruct += argEnvStruct;
-        } else {
-          if (argEnvStruct) envStruct += "\n\n" + argEnvStruct;
-        }
-      }
-      prelude += `\n  ${calleeExpr}(&${calleeEnvName});`;
-      if (procInfo.returnCType === "void") {
-        return { expr: "", prelude, envStruct: envStruct || undefined };
-      } else {
-        return { expr: `${calleeEnvName}.result`, prelude, envStruct: envStruct || undefined };
-      }
+    } else {
+      return { valInst: { inst: "env.load", envId: ast.toEnv, varName: ast.name } };
     }
-    case "integer":
-      return { expr: `${ast.value}` };
-    case "bool":
-      return { expr: ast.value ? "true" : "false" };
-    case "unit":
-      return { expr: "" };
-    case "variable": {
-      let parentAccess = "";
-      if (ast.level > 0) {
-        parentAccess += "parent";
-        for (let i = 0; i < ast.level-1; i++) {
-          parentAccess += "->parent";
-        }
-      }
-      if (ast.level === 0) {
-        return { expr: `env${ast.fromEnv}${procEnvIds.includes(ast.fromEnv) ? "->" : "."}arg_${ast.name}` };
-      } else if (ast.level > 0) {
-        return { expr: `((struct Env${ast.toEnv} *)(((EnvHeader *)&env${ast.fromEnv})->${parentAccess}))->arg_${ast.name}` };
-      } else {
-        // TODO: level === -1 の時、関数以外も対応する
-        const procName = getProcName(ast.name);
-        return { expr: procName };
-      }
+  }
+
+  private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACProcBodyInst[] = [
+      { inst: "let_env.init", envId: ast.envId, parentEnvId: this.#procCtx.currentEnvId() }
+    ];
+    this.#procCtx.enterScope(ast.envId);
+
+    for (const { name, value } of ast.declares) {
+      const { prelude: valPrelude, valInst } = this.codegenExpr(value, defTypeMap);
+      if (valPrelude) prelude = prelude.concat(valPrelude);
+      prelude.push(
+        { inst: "let_env.defvar", envId: ast.envId, varName: name, ty: getExprType(value)!, value: valInst! }
+      );
     }
-    case "let":
-      return codegenLet(ast, envId);
-    case "if":
-      return codegenIf(ast, envId);
-    default:
-      throw new Error(`invalid term node: ${ast.nodeType}`);
-  }
-};
 
-const codegenLet = (ast: AstLetNode, parentEnvId: number): { expr: string, prelude: string, envStruct: string } => {
-  let subEnvStruct = "";
-  let envStruct = `struct Env${ast.envId} {\n  EnvHeader header;`;
-  let prelude = `  struct Env${ast.envId} env${ast.envId} = `;
-  if (parentEnvId === -1) {
-    prelude += "{};";
-  } else {
-    prelude += `{ .header = { .parent = (EnvHeader *)&env${parentEnvId} }};`;
+    const { prelude: bodyPrelude, valInst } = this.codegenExpr(ast.body, defTypeMap);
+    if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
+
+    this.#procCtx.leaveScope();
+    return { prelude, valInst };
   }
 
-  for (const { name, ty, value } of ast.declares) {
-    if (ty?.tyKind === "builtin") {
-      if (ty.name === "i32") {
-        envStruct += `\n  int32_t arg_${name};`;
-      } else if (ty.name === "bool") {
-        envStruct += `\n  bool arg_${name};`;
-      }
+  private codegenIf(ast: AstIfNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACProcBodyInst[] = [];
+    const resultTmpId = this.#procCtx.freshProcTmpId;
+    const isUnitType = tyEqual(ast.ty!, { tyKind: "primitive", name: "()" });
+
+    if (!isUnitType) {
+      prelude.push(
+        { inst: "proc_env.deftmp_noval", envId: this.#procCtx.procEnvId(), idx: resultTmpId, ty: ast.ty! }
+      );
     }
-    const { expr, prelude: valuePrelude, envStruct: valueEnvStruct } = codegenExpr(value, ast.envId);
-    if (valueEnvStruct) subEnvStruct += (subEnvStruct.length === 0 ? "" : "\n\n") + valueEnvStruct;
-    if (valuePrelude) prelude += "\n" + valuePrelude;
-    prelude += `\n  env${ast.envId}.arg_${name} = ${expr};`;
-  }
 
-  envStruct += "\n};";
+    const { prelude: condPrelude, valInst: condValInst } = this.codegenExpr(ast.cond, defTypeMap);
+    if (condPrelude) prelude = prelude.concat(condPrelude);
 
-  const { expr, prelude: bodyPrelude, envStruct: bodyEnvStruct } = codegenExpr(ast.body, ast.envId);
-  if (bodyPrelude) prelude += "\n" + bodyPrelude;
-  if (bodyEnvStruct) subEnvStruct += (subEnvStruct.length === 0 ? "" : "\n\n") + bodyEnvStruct;
+    let thenInsts: ACProcBodyInst[] = [];
+    const { prelude: thenPrelude, valInst: thenValInst } = this.codegenExpr(ast.then, defTypeMap);
+    if (thenPrelude) thenInsts = thenInsts.concat(thenPrelude);
 
-  if (subEnvStruct.length !== 0) {
-    envStruct = subEnvStruct + "\n\n" + envStruct;
-  }
+    let elseInsts: ACProcBodyInst[] = [];
+    const { prelude: elsePrelude, valInst: elseValInst } = this.codegenExpr(ast.else, defTypeMap);
+    if (elsePrelude) elseInsts = elseInsts.concat(elsePrelude);
 
-  return { expr, prelude, envStruct };
-};
-
-const codegenIf = (ast: AstIfNode, envId: number): { expr: string, prelude: string, envStruct: string } => {
-  // TODO: １行で終わらない式は戻り値を格納する一時変数が必要だが、
-  //       GC時にトレースできるようにしなければならない
-  //       現在いるスコープのenvがその場所を触れるようにしなければならない
-  const ty = ast.ty!;
-  let tyStr;
-  if (ty.tyKind === "builtin") {
-    if (ty.name === "i32") {
-      tyStr = "int32_t";
-    } else if (ty.name === "bool") {
-      tyStr = "bool";
+    if (isUnitType) {
+      if (thenValInst) thenInsts.push(thenValInst);
+      if (elseValInst) elseInsts.push(elseValInst);
+    } else {
+      thenInsts.push(
+        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId(), idx: resultTmpId, value: thenValInst! }
+      );
+      elseInsts.push(
+        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId(), idx: resultTmpId, value: elseValInst! }
+      );
     }
-  } else {
-    throw new Error("unimplemented for other if return type");
+
+    prelude.push(
+      { inst: "ifelse", cond: condValInst!, then: thenInsts, else: elseInsts }
+    );
+
+    return {
+      prelude,
+      valInst: isUnitType ? undefined : { inst: "proc_env.load_tmp", envId: this.#procCtx.procEnvId(), idx: resultTmpId }
+    }
   }
-
-  let resultVar;
-  if (ty.tyKind === "builtin" && ty.name !== "()") {
-    resultVar = `tmp${tmpVarId++}`;
-  }
-  let prelude = resultVar ? `  ${tyStr} ${resultVar};` : "";
-  let envStruct = "";
-
-  const { expr: condExpr, prelude: condPrelude, envStruct: condEnvStruct } = codegenExpr(ast.cond, envId);
-  if (condPrelude) prelude += "\n" + condPrelude;
-  if (condEnvStruct) envStruct += condEnvStruct;
-  prelude += `\n  if (${condExpr}) {`;
-
-  const { expr: thenExpr, prelude: thenPrelude, envStruct: thenEnvStruct } = codegenExpr(ast.then, envId);
-  if (thenPrelude) prelude += "\n" + thenPrelude;
-  if (thenEnvStruct) envStruct += (envStruct.length === 0 ? "" : "\n\n") + thenEnvStruct;
-  if (resultVar) {
-    prelude += `\n  ${resultVar} = ${thenExpr};`;
-  }
-
-  prelude += "\n  } else {";
-
-  const { expr: elseExpr, prelude: elsePrelude, envStruct: elseEnvStruct } = codegenExpr(ast.else, envId);
-  if (elsePrelude) prelude += "\n" + elsePrelude;
-  if (elseEnvStruct) envStruct += (envStruct.length === 0 ? "" : "\n\n") + elseEnvStruct;
-  if (resultVar) {
-    prelude += `\n  ${resultVar} = ${elseExpr};`;
-  }
-
-  prelude += "\n  }";
-
-  return { expr: resultVar ? resultVar : "", prelude, envStruct };
-};
+}

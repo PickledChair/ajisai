@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.172.0/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std@0.198.0/testing/asserts.ts";
 import { TokenType } from "../src/token.ts";
 import { Lexer } from "../src/lexer.ts";
 

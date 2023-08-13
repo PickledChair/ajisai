@@ -1,19 +1,20 @@
-export type Type = BuiltinType | ProcType | DummyType;
+export type Type = PrimitiveType | ProcType | DummyType;
 
-const builtinTypeNames = ["i32", "bool", "()"] as const;
-export type BuiltinTypeName = (typeof builtinTypeNames)[number];
-export type BuiltinType = { tyKind: "builtin", name: BuiltinTypeName };
+const primitiveTypeNames = ["i32", "bool", "()"] as const;
+export type PrimitiveTypeName = (typeof primitiveTypeNames)[number];
+export type PrimitiveType = { tyKind: "primitive", name: PrimitiveTypeName };
 
-export const isBuiltinTypeName = (s: string): BuiltinTypeName | null => {
-  return (builtinTypeNames as Readonly<string[]>).includes(s) ? s as BuiltinTypeName : null;
+export const isPrimitiveTypeName = (s: string): PrimitiveTypeName | null => {
+  return (primitiveTypeNames as Readonly<string[]>).includes(s) ? s as PrimitiveTypeName : null;
 };
 
-export type ProcType = { tyKind: "proc", argTypes: Type[], bodyType: Type };
+export type ProcKind = "userdef" | "builtin" | "builtinWithEnv";
+export type ProcType = { tyKind: "proc", procKind: ProcKind, argTypes: Type[], bodyType: Type };
 
 export type DummyType = { tyKind: "dummy" };
 
 export const tyEqual = (left: Type, right: Type): boolean => {
-  if (left.tyKind == "builtin" && right.tyKind == "builtin") {
+  if (left.tyKind == "primitive" && right.tyKind == "primitive") {
     return left.name == right.name;
   } else if (left.tyKind == "proc" && right.tyKind == "proc") {
     if (left.argTypes.length !== right.argTypes.length) return false;
@@ -27,4 +28,17 @@ export const tyEqual = (left: Type, right: Type): boolean => {
     return true;
   }
   return false;
+};
+
+export const toCType = (ty: Type): string => {
+  if (ty.tyKind === "primitive") {
+    switch (ty.name) {
+      case "i32": return "int32_t";
+      case "bool": return "bool";
+      case "()": return "void";
+    }
+  } else if (ty.tyKind === "proc") {
+    throw new Error("unimplemented for proc");
+  }
+  throw new Error("invalid type");
 };

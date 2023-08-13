@@ -1,5 +1,5 @@
-import { parse } from "https://deno.land/std@0.194.0/flags/mod.ts";
-import { Lexer, Parser, semantAnalyze, codegen } from "./mod.ts";
+import { parse } from "https://deno.land/std@0.198.0/flags/mod.ts";
+import { CodeGenerator, Lexer, Parser, SemanticAnalyzer, printCSrc } from "./mod.ts";
 
 if (import.meta.main) {
   const { _: [fileName,], ...otherOptions } = parse(Deno.args);
@@ -13,12 +13,14 @@ if (import.meta.main) {
       const lexer = new Lexer(source);
       const parser = new Parser(lexer);
       const ast = parser.parse();
-      const analyzedAst = semantAnalyze(ast);
-      const cSrc = codegen(analyzedAst);
+      const semAnalyzer = new SemanticAnalyzer(ast);
+      const analyzedAst = semAnalyzer.analyze();
+      const codeGen = new CodeGenerator(analyzedAst, semAnalyzer.defTypeMap);
+      const acir = codeGen.codegen();
 
       const optionCSourcePath = otherOptions["S"];
       if (optionCSourcePath) {
-        await Deno.writeTextFile(optionCSourcePath, cSrc);
+        await printCSrc(optionCSourcePath, acir);
         Deno.exit(0);
       }
 
@@ -35,7 +37,7 @@ if (import.meta.main) {
       }
 
       const mainCSourcePath = `${distDir}/main.c`;
-      await Deno.writeTextFile(mainCSourcePath, cSrc);
+      await printCSrc(mainCSourcePath, acir);
       console.log(`success: writing to ${mainCSourcePath}`);
 
       const wnos = ["-Wno-parentheses-equality"];

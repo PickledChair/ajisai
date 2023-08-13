@@ -1,7 +1,7 @@
 import { Token, TokenType } from "./token.ts";
 import { Lexer } from "./lexer.ts";
 import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstIfNode, AstLetNode, AstModuleNode, AstProcArgNode, BinOpKind } from "./ast.ts";
-import { Type, isBuiltinTypeName } from "./type.ts";
+import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
   #lexer: Lexer;
@@ -38,14 +38,14 @@ export class Parser {
 
     let bodyType: Type;
     if (this.eat("->")) {
-      const tyName = isBuiltinTypeName(this.expect("identifier").value);
+      const tyName = isPrimitiveTypeName(this.expect("identifier").value);
       if (tyName) {
-        bodyType = { tyKind: "builtin", name: tyName };
+        bodyType = { tyKind: "primitive", name: tyName };
       } else {
         throw new Error("unimplemented for custom type");
       }
     } else {
-      bodyType = { tyKind: "builtin", name: "()" };
+      bodyType = { tyKind: "primitive", name: "()" };
     }
 
     this.expect("{");
@@ -56,7 +56,7 @@ export class Parser {
       nodeType: "declare",
       name: name.value,
       value: { nodeType: "proc", args, body, envId: -1 },
-      ty: { tyKind: "proc", argTypes, bodyType }
+      ty: { tyKind: "proc", procKind: "userdef", argTypes, bodyType }
     };
     return { nodeType: "def", declare };
   }
@@ -68,12 +68,12 @@ export class Parser {
     if (this.eat("(")) {
       // TODO: 現在はunit型だけ考慮すれば良いが、いずれタプルに対応する
       this.expect(")");
-      ty = { tyKind: "builtin", name: "()" };
+      ty = { tyKind: "primitive", name: "()" };
     } else {
       const tyName = this.expect("identifier").value;
-      const builtinName = isBuiltinTypeName(tyName);
+      const builtinName = isPrimitiveTypeName(tyName);
       if (builtinName) {
-        ty = { tyKind: "builtin", name: builtinName };
+        ty = { tyKind: "primitive", name: builtinName };
       } else {
         // TODO: collection type やユーザー定義型に対応
         throw new Error("unimplemented for collection type and user definition type signature");
@@ -332,7 +332,10 @@ export class Parser {
   }
 
   private parseCall(callee: AstExprNode): AstCallNode {
-    const args = [];
+    const args: AstExprNode[] = [];
+
+    if (this.eat(")")) return { nodeType: "call", callee, args };
+
     while (true) {
       args.push(this.parseExpr());
       if (!this.eat(",")) {

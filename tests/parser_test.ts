@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.172.0/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std@0.198.0/testing/asserts.ts";
 import { Lexer } from "../src/lexer.ts";
 import { Parser } from "../src/parser.ts";
 
@@ -155,26 +155,27 @@ Deno.test("parsing proc definition test", () => {
             name: "add",
             ty: {
               tyKind: "proc",
+              procKind: "userdef",
               argTypes: [
                 {
-                  tyKind: "builtin",
+                  tyKind: "primitive",
                   name: "i32",
                 },
                 {
-                  tyKind: "builtin",
+                  tyKind: "primitive",
                   name: "i32",
                 },
               ],
               bodyType: {
-                tyKind: "builtin",
+                tyKind: "primitive",
                 name: "i32",
               }
             },
             value: {
               nodeType: "proc",
               args: [
-                { nodeType: "procArg", name: "a", ty: { tyKind: "builtin", name: "i32" } },
-                { nodeType: "procArg", name: "b", ty: { tyKind: "builtin", name: "i32" } }
+                { nodeType: "procArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
+                { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
               ],
               body: {
                 nodeType: "binary", operator: "+",
@@ -228,9 +229,10 @@ Deno.test("parsing empty main proc test", () => {
             name: "main",
             ty: {
               tyKind: "proc",
+              procKind: "userdef",
               argTypes: [],
               bodyType: {
-                tyKind: "builtin",
+                tyKind: "primitive",
                 name: "()"
               }
             },
