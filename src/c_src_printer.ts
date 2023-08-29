@@ -57,7 +57,7 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 };
 
 const printProtoType = async (file: Deno.FsFile, encoder: TextEncoder, procDecl: ACProcDeclInst) => {
-  let line = `${toCType(procDecl.resultType)} userdef_${procDecl.procName}(ProcFrame *parent_env`;
+  let line = `${toCType(procDecl.resultType)} userdef_${procDecl.procName}(ProcFrame *parent_frame`;
   for (const [argName, argTy] of procDecl.args) {
     line += `, ${toCType(argTy)} ${argName}`;
   }
@@ -67,7 +67,7 @@ const printProtoType = async (file: Deno.FsFile, encoder: TextEncoder, procDecl:
 
 const printEntry = async (file: Deno.FsFile, encoder: TextEncoder, entry: ACEntryInst) => {
   await writeAll(file, encoder.encode("void ajisai_main(void) {\n"));
-  await writeAll(file, encoder.encode("  ProcFrame *parent_env = NULL;\n"));
+  await writeAll(file, encoder.encode("  ProcFrame *parent_frame = NULL;\n"));
   for (const inst of entry.body) {
     await printProcBodyInst(file, encoder, inst);
   }
@@ -75,7 +75,7 @@ const printEntry = async (file: Deno.FsFile, encoder: TextEncoder, entry: ACEntr
 };
 
 const printProcDef = async (file: Deno.FsFile, encoder: TextEncoder, procDef: ACProcDefInst) => {
-  let headLine = `${toCType(procDef.resultType)} userdef_${procDef.procName}(ProcFrame *parent_env`;
+  let headLine = `${toCType(procDef.resultType)} userdef_${procDef.procName}(ProcFrame *parent_frame`;
   for (const [argName, argTy] of procDef.args) {
     headLine += `, ${toCType(argTy)} env${procDef.envId}_var_${argName}`;
   }
@@ -94,7 +94,7 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
 
   switch (inst.inst) {
     case "proc_frame.init":
-      line = `  ProcFrame proc_frame = { .parent = parent_env };\n`;
+      line = `  ProcFrame proc_frame = { .parent = parent_frame };\n`;
       break;
     case "proc.return":
       line = `  return ${makePushValLiteral(inst.value)};\n`;
