@@ -6,9 +6,9 @@ const defaultFileHeader = `#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
-typedef struct EnvFrame EnvFrame;
-struct EnvFrame {
-  EnvFrame *parent;
+typedef struct ProcFrame ProcFrame;
+struct ProcFrame {
+  ProcFrame *parent;
 };
 
 void ajisai_println_i32(int32_t value) {
@@ -57,7 +57,7 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 };
 
 const printProtoType = async (file: Deno.FsFile, encoder: TextEncoder, procDecl: ACProcDeclInst) => {
-  let line = `${toCType(procDecl.resultType)} userdef_${procDecl.procName}(EnvFrame *parent_env`;
+  let line = `${toCType(procDecl.resultType)} userdef_${procDecl.procName}(ProcFrame *parent_env`;
   for (const [argName, argTy] of procDecl.args) {
     line += `, ${toCType(argTy)} ${argName}`;
   }
@@ -67,7 +67,7 @@ const printProtoType = async (file: Deno.FsFile, encoder: TextEncoder, procDecl:
 
 const printEntry = async (file: Deno.FsFile, encoder: TextEncoder, entry: ACEntryInst) => {
   await writeAll(file, encoder.encode("void ajisai_main(void) {\n"));
-  await writeAll(file, encoder.encode("  EnvFrame *parent_env = NULL;\n"));
+  await writeAll(file, encoder.encode("  ProcFrame *parent_env = NULL;\n"));
   for (const inst of entry.body) {
     await printProcBodyInst(file, encoder, inst);
   }
@@ -75,7 +75,7 @@ const printEntry = async (file: Deno.FsFile, encoder: TextEncoder, entry: ACEntr
 };
 
 const printProcDef = async (file: Deno.FsFile, encoder: TextEncoder, procDef: ACProcDefInst) => {
-  let headLine = `${toCType(procDef.resultType)} userdef_${procDef.procName}(EnvFrame *parent_env`;
+  let headLine = `${toCType(procDef.resultType)} userdef_${procDef.procName}(ProcFrame *parent_env`;
   for (const [argName, argTy] of procDef.args) {
     headLine += `, ${toCType(argTy)} env${procDef.envId}_var_${argName}`;
   }
@@ -93,22 +93,22 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
   let line = "";
 
   switch (inst.inst) {
-    case "proc_env.init":
-      line = `  EnvFrame proc_env = { .parent = parent_env };\n`;
+    case "proc_frame.init":
+      line = `  ProcFrame proc_frame = { .parent = parent_env };\n`;
       break;
     case "proc.return":
       line = `  return ${makePushValLiteral(inst.value)};\n`;
       break;
-    case "let_env.defvar":
+    case "env.defvar":
       line = `  ${toCType(inst.ty)} env${inst.envId}_var_${inst.varName} = ${makePushValLiteral(inst.value)};\n`;
       break;
-    case "proc_env.deftmp":
+    case "proc_frame.deftmp":
       line = `  ${toCType(inst.ty)} env${inst.envId}_tmp${inst.idx} = ${makePushValLiteral(inst.value)};\n`;
       break;
-    case "proc_env.deftmp_noval":
+    case "proc_frame.deftmp_noval":
       line = `  ${toCType(inst.ty)} env${inst.envId}_tmp${inst.idx};\n`;
       break;
-    case "proc_env.store_tmp":
+    case "proc_frame.store_tmp":
       line = `  env${inst.envId}_tmp${inst.idx} = ${makePushValLiteral(inst.value)};\n`;
       break;
     case "ifelse":
@@ -133,7 +133,7 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       return `userdef_${inst.varName}`;
     case "env.load":
       return `env${inst.envId}_var_${inst.varName}`;
-    case "proc_env.load_tmp":
+    case "proc_frame.load_tmp":
       return `env${inst.envId}_tmp${inst.idx}`;
     case "builtin.call": {
       const callee = makePushValLiteral(inst.callee);
@@ -143,7 +143,7 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
     case "proc.call": {
       const callee = makePushValLiteral(inst.callee);
       const args = inst.args.map(arg => makePushValLiteral(arg));
-      return `${callee}(&proc_env${args.length === 0 ? "" : ", " + args.join(", ")})`;
+      return `${callee}(&proc_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
     }
     case "i32.const":
     case "bool.const":

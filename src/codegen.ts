@@ -112,7 +112,7 @@ class ProcCodeGenerator {
     const procDeclInst = this.makeProcDeclInst();
 
     let bodyInsts: ACProcBodyInst[]  = [
-      { inst: "proc_env.init" },
+      { inst: "proc_frame.init" },
     ];
 
     const { prelude, valInst } = this.codegenExpr(this.#procNode.body, defTypeMap);
@@ -315,7 +315,7 @@ class ProcCodeGenerator {
       const { prelude: valPrelude, valInst } = this.codegenExpr(value, defTypeMap);
       if (valPrelude) prelude = prelude.concat(valPrelude);
       prelude.push(
-        { inst: "let_env.defvar", envId: ast.envId, varName: name, ty: getExprType(value)!, value: valInst! }
+        { inst: "env.defvar", envId: ast.envId, varName: name, ty: getExprType(value)!, value: valInst! }
       );
     }
 
@@ -333,7 +333,7 @@ class ProcCodeGenerator {
 
     if (!isUnitType) {
       prelude.push(
-        { inst: "proc_env.deftmp_noval", envId: this.#procCtx.procEnvId, idx: resultTmpId, ty: ast.ty! }
+        { inst: "proc_frame.deftmp_noval", envId: this.#procCtx.procEnvId, idx: resultTmpId, ty: ast.ty! }
       );
     }
 
@@ -353,10 +353,10 @@ class ProcCodeGenerator {
       if (elseValInst) elseInsts.push(elseValInst);
     } else {
       thenInsts.push(
-        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: thenValInst! }
+        { inst: "proc_frame.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: thenValInst! }
       );
       elseInsts.push(
-        { inst: "proc_env.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: elseValInst! }
+        { inst: "proc_frame.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: elseValInst! }
       );
     }
 
@@ -366,7 +366,7 @@ class ProcCodeGenerator {
 
     return {
       prelude,
-      valInst: isUnitType ? undefined : { inst: "proc_env.load_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId }
+      valInst: isUnitType ? undefined : { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId }
     }
   }
 }
