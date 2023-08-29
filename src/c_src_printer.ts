@@ -94,18 +94,10 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
 
   switch (inst.inst) {
     case "proc_env.init":
-      line = `  EnvFrame env${inst.envId} = { .parent = parent_env };\n`;
+      line = `  EnvFrame proc_env = { .parent = parent_env };\n`;
       break;
     case "proc.return":
       line = `  return ${makePushValLiteral(inst.value)};\n`;
-      break;
-    case "let_env.init":
-      line = `  EnvFrame env${inst.envId} = `;
-      if (inst.parentEnvId) {
-        line += `{ .parent = &env${inst.parentEnvId} };\n`;
-      } else {
-        line += "{};\n";
-      }
       break;
     case "let_env.defvar":
       line = `  ${toCType(inst.ty)} env${inst.envId}_var_${inst.varName} = ${makePushValLiteral(inst.value)};\n`;
@@ -151,7 +143,7 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
     case "proc.call": {
       const callee = makePushValLiteral(inst.callee);
       const args = inst.args.map(arg => makePushValLiteral(arg));
-      return `${callee}(&env${inst.parentEnvId}${args.length === 0 ? "" : ", " + args.join(", ")})`;
+      return `${callee}(&proc_env${args.length === 0 ? "" : ", " + args.join(", ")})`;
     }
     case "i32.const":
     case "bool.const":

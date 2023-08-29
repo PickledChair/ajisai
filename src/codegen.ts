@@ -112,7 +112,7 @@ class ProcCodeGenerator {
     const procDeclInst = this.makeProcDeclInst();
 
     let bodyInsts: ACProcBodyInst[]  = [
-      { inst: "proc_env.init", envId: this.#procCtx.procEnvId },
+      { inst: "proc_env.init" },
     ];
 
     const { prelude, valInst } = this.codegenExpr(this.#procNode.body, defTypeMap);
@@ -271,7 +271,7 @@ class ProcCodeGenerator {
         } else if (varTy.procKind === "userdef") {
           return {
             prelude: prelude.length === 0 ? undefined : prelude,
-            valInst: { inst: "proc.call", callee: calleeValInst!, parentEnvId: this.#procCtx.currentEnvId, args }
+            valInst: { inst: "proc.call", callee: calleeValInst!, args }
           };
         } else {
           throw new Error("unimplemented for other proc type");
@@ -306,10 +306,9 @@ class ProcCodeGenerator {
     }
   }
 
-  private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
-    let prelude: ACProcBodyInst[] = [
-      { inst: "let_env.init", envId: ast.envId, parentEnvId: this.#procCtx.currentEnvId }
-    ];
+  private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACProcBodyInst[] = [];
+
     this.#procCtx.enterScope(ast.envId);
 
     for (const { name, value } of ast.declares) {
@@ -324,7 +323,7 @@ class ProcCodeGenerator {
     if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
 
     this.#procCtx.leaveScope();
-    return { prelude, valInst };
+    return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
   }
 
   private codegenIf(ast: AstIfNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {

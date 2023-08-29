@@ -17,18 +17,17 @@ export type ACProcDefInst = {
 
 export type ACProcBodyInst =
   ACProcEnvInitInst | ACProcReturnInst |
-  ACLetEnvInitInst | ACLetEnvDefVarInst |
+  ACLetEnvDefVarInst |
   ACProcEnvDefTmp | ACProcEnvDefTmpNoVal | ACProcEnvStoreTmp |
   ACIfElseInst |
   ACPushValInst;
 
-export type ACLetEnvInitInst = { inst: "let_env.init", envId: number, parentEnvId: number };
 export type ACLetEnvDefVarInst = { inst: "let_env.defvar", envId: number, varName: string, ty: Type, value: ACPushValInst };
 export type ACEnvLoadInst = { inst: "env.load", envId: number, varName: string };
 export type ACModDefsLoadInst = { inst: "mod_defs.load", varName: string };
 export type ACBuiltinLoadInst = { inst: "builtin.load", varName: string };
 
-export type ACProcEnvInitInst = { inst: "proc_env.init", envId: number }
+export type ACProcEnvInitInst = { inst: "proc_env.init" }
 export type ACProcEnvDefTmp = { inst: "proc_env.deftmp", envId: number, idx: number, ty: Type, value: ACPushValInst };
 export type ACProcEnvDefTmpNoVal = { inst: "proc_env.deftmp_noval", envId: number, idx: number, ty: Type };
 export type ACProcEnvLoadTmp = { inst: "proc_env.load_tmp", envId: number, idx: number };
@@ -50,7 +49,7 @@ export type ACPushValInst =
   ACBoolConstInst | ACBoolNotInst | ACBoolEqInst | ACBoolNeInst | ACBoolAndInst | ACBoolOrInst;
 
 export type ACBuiltinCallInst = { inst: "builtin.call", callee: ACPushValInst, args: ACPushValInst[] };
-export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, parentEnvId: number, args: ACPushValInst[] };
+export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
 
 export type ACI32ConstInst = { inst: "i32.const", value: number };
 export type ACI32NegInst = { inst: "i32.neg", operand: ACPushValInst };
