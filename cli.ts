@@ -2,68 +2,67 @@ import { parse } from "https://deno.land/std@0.201.0/flags/mod.ts";
 import { CodeGenerator, Lexer, Parser, SemanticAnalyzer, printCSrc } from "./mod.ts";
 
 if (import.meta.main) {
-  const { _: [fileName,], ...otherOptions } = parse(Deno.args);
+  const { _: [fileName_,], ...otherOptions } = parse(Deno.args);
 
-  if (fileName) {
-    if (typeof fileName == "number") {
-      console.log(`Invalid filename: ${fileName}`);
-    } else {
-      const source = await Deno.readTextFile(fileName);
+  if (fileName_) {
+    const fileName = fileName_.toString();
 
-      const lexer = new Lexer(source);
-      const parser = new Parser(lexer);
-      const ast = parser.parse();
-      const semAnalyzer = new SemanticAnalyzer(ast);
-      const analyzedAst = semAnalyzer.analyze();
-      const codeGen = new CodeGenerator(analyzedAst, semAnalyzer.defTypeMap);
-      const acir = codeGen.codegen();
+    const source = await Deno.readTextFile(fileName);
 
-      const optionCSourcePath = otherOptions["S"];
-      if (optionCSourcePath) {
-        await printCSrc(optionCSourcePath, acir);
-        Deno.exit(0);
-      }
+    const lexer = new Lexer(source);
+    const parser = new Parser(lexer);
+    const ast = parser.parse();
+    const semAnalyzer = new SemanticAnalyzer(ast);
+    const analyzedAst = semAnalyzer.analyze();
+    const codeGen = new CodeGenerator(analyzedAst, semAnalyzer.defTypeMap);
+    const acir = codeGen.codegen();
 
-      const distDir = "ajisai-out";
-      try {
-        const distDirStat = await Deno.stat(distDir);
-
-        if (!distDirStat.isDirectory) {
-          console.error(`"ajisai-out" must be directory`);
-          Deno.exit(1);
-        }
-      } catch {
-        await Deno.mkdir(distDir);
-      }
-
-      const mainCSourcePath = `${distDir}/main.c`;
-      await printCSrc(mainCSourcePath, acir);
-      console.log(`success: writing to ${mainCSourcePath}`);
-
-      const wnos = ["-Wno-parentheses-equality"];
-
-      const outputFileName = otherOptions["o"];
-      let ccArgs;
-      if (outputFileName) {
-        ccArgs = ["-o", outputFileName, ...wnos, mainCSourcePath];
-      } else {
-        ccArgs = [...wnos, mainCSourcePath];
-      }
-
-      const command = new Deno.Command("cc", {
-        args: ccArgs,
-      });
-      const { code, stdout, stderr } = command.outputSync();
-
-      const stdoutStr = new TextDecoder().decode(stdout);
-      if (stdoutStr.length > 0) console.log(stdoutStr);
-      const stderrStr = new TextDecoder().decode(stderr);
-      if (stderrStr.length > 0) console.error(stderrStr);
-
-      if (code !== 0) {
-        Deno.exit(code);
-      }
-      console.log("success: compiling");
+    const optionCSourcePath_ = otherOptions["S"];
+    if (optionCSourcePath_) {
+      const optionCSourcePath = optionCSourcePath_.toString();
+      await printCSrc(optionCSourcePath, acir);
+      Deno.exit(0);
     }
+
+    const distDir = "ajisai-out";
+    try {
+      const distDirStat = await Deno.stat(distDir);
+
+      if (!distDirStat.isDirectory) {
+        console.error(`"ajisai-out" must be directory`);
+        Deno.exit(1);
+      }
+    } catch {
+      await Deno.mkdir(distDir);
+    }
+
+    const mainCSourcePath = `${distDir}/main.c`;
+    await printCSrc(mainCSourcePath, acir);
+    console.log(`success: writing to ${mainCSourcePath}`);
+
+    const wnos = ["-Wno-parentheses-equality"];
+
+    const outputFileName = otherOptions["o"];
+    let ccArgs;
+    if (outputFileName) {
+      ccArgs = ["-o", outputFileName, ...wnos, mainCSourcePath];
+    } else {
+      ccArgs = [...wnos, mainCSourcePath];
+    }
+
+    const command = new Deno.Command("cc", {
+      args: ccArgs,
+    });
+    const { code, stdout, stderr } = command.outputSync();
+
+    const stdoutStr = new TextDecoder().decode(stdout);
+    if (stdoutStr.length > 0) console.log(stdoutStr);
+    const stderrStr = new TextDecoder().decode(stderr);
+    if (stderrStr.length > 0) console.error(stderrStr);
+
+    if (code !== 0) {
+      Deno.exit(code);
+    }
+    console.log("success: compiling");
   }
 }
