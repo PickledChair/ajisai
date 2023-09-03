@@ -156,6 +156,8 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       return `(${makePushValLiteral(inst.left)} * ${makePushValLiteral(inst.right)})`;
     case "i32.div":
       return `(${makePushValLiteral(inst.left)} / ${makePushValLiteral(inst.right)})`;
+    case "i32.mod":
+      return `(${makePushValLiteral(inst.left)} % ${makePushValLiteral(inst.right)})`;
     case "i32.neg":
       return `-${makePushValLiteral(inst.operand)}`;
     case "bool.not":

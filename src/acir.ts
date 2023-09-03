@@ -43,7 +43,7 @@ export type ACPushValInst =
   ACProcFrameLoadTmp |
   ACBuiltinCallInst | ACProcCallInst |
 
-  ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst |
+  ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
 
   ACBoolConstInst | ACBoolNotInst | ACBoolEqInst | ACBoolNeInst | ACBoolAndInst | ACBoolOrInst;
@@ -57,6 +57,7 @@ export type ACI32AddInst = { inst: "i32.add", left: ACPushValInst, right: ACPush
 export type ACI32SubInst = { inst: "i32.sub", left: ACPushValInst, right: ACPushValInst };
 export type ACI32MulInst = { inst: "i32.mul", left: ACPushValInst, right: ACPushValInst };
 export type ACI32DivInst = { inst: "i32.div", left: ACPushValInst, right: ACPushValInst };
+export type ACI32ModInst = { inst: "i32.mod", left: ACPushValInst, right: ACPushValInst };
 export type ACI32EqInst = { inst: "i32.eq", left: ACPushValInst, right: ACPushValInst };
 export type ACI32NeInst = { inst: "i32.ne", left: ACPushValInst, right: ACPushValInst };
 export type ACI32LtInst = { inst: "i32.lt", left: ACPushValInst, right: ACPushValInst };

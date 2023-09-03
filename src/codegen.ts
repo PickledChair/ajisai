@@ -215,6 +215,7 @@ class ProcCodeGenerator {
         case "-": return { prelude, valInst: { inst: "i32.sub", left: leftValInst!, right: rightValInst! } };
         case "*": return { prelude, valInst: { inst: "i32.mul", left: leftValInst!, right: rightValInst! } };
         case "/": return { prelude, valInst: { inst: "i32.div", left: leftValInst!, right: rightValInst! } };
+        case "%": return { prelude, valInst: { inst: "i32.mod", left: leftValInst!, right: rightValInst! } };
       }
     }
 
