@@ -11,17 +11,19 @@ export type AstModuleNode = { nodeType: "module", defs: AstDefNode[] };
 
 export type AstDefNode = { nodeType: "def", declare: AstDeclareNode };
 
-export type AstExprNode =
+export type AstExprNode = AstExprSeqNode |
   AstProcNode | AstIfNode | AstLetNode | AstCallNode | AstBinaryNode | AstUnaryNode | AstBoolNode | AstIntegerNode | AstVariableNode | AstUnitNode;
 
-export type AstProcNode = { nodeType: "proc", args: AstProcArgNode[], body: AstExprNode, envId: number, bodyTy?: Type };
+export type AstExprSeqNode = { nodeType: "exprSeq", exprs: AstExprNode[], ty?: Type };
+
+export type AstProcNode = { nodeType: "proc", args: AstProcArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type };
 export type AstProcArgNode = { nodeType: "procArg", name: string, ty?: Type };
 
-export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprNode, bodyTy?: Type, envId: number };
+export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number };
 
 export type AstDeclareNode = { nodeType: "declare", name: string, ty?: Type, value: AstExprNode };
 
-export type AstIfNode = { nodeType: "if", cond: AstExprNode, then: AstExprNode, else: AstExprNode, ty?: Type };
+export type AstIfNode = { nodeType: "if", cond: AstExprNode, then: AstExprSeqNode, else: AstExprSeqNode, ty?: Type };
 
 export type BinOpKind = "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||";
 export type AstBinaryNode = { nodeType: "binary", operator: BinOpKind, left: AstExprNode, right: AstExprNode, ty?: Type };

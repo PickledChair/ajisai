@@ -1,6 +1,6 @@
 import { Token, TokenType } from "./token.ts";
 import { Lexer } from "./lexer.ts";
-import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstIfNode, AstLetNode, AstModuleNode, AstProcArgNode, BinOpKind } from "./ast.ts";
+import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstExprSeqNode, AstIfNode, AstLetNode, AstModuleNode, AstProcArgNode, BinOpKind } from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
@@ -49,8 +49,7 @@ export class Parser {
     }
 
     this.expect("{");
-    const body = this.parseExpr();
-    this.expect("}");
+    const body = this.parseExprSeq();
 
     const declare: AstDeclareNode = {
       nodeType: "declare",
@@ -92,6 +91,28 @@ export class Parser {
     return this.parseLogOr();
   }
 
+  private parseExprSeq(): AstExprSeqNode {
+    const exprs: AstExprNode[] = [];
+
+    while (true) {
+      exprs.push(this.parseExpr());
+
+      if (this.eat(";")) {
+        if (this.eat("}")) {
+          exprs.push({ nodeType: "unit" });
+          break;
+        } else {
+          continue;
+        }
+      } else {
+        this.expect("}");
+        break;
+      }
+    }
+
+    return { nodeType: "exprSeq", exprs };
+  }
+
   private parseLet(): AstLetNode {
     const declares = [];
     if (!this.eat("{")) {
@@ -101,8 +122,7 @@ export class Parser {
       }
       this.expect("{");
     }
-    const body = this.parseExpr();
-    this.expect("}");
+    const body = this.parseExprSeq();
 
     return { nodeType: "let", declares, body, envId: -1 };
   }
@@ -125,14 +145,12 @@ export class Parser {
     const cond = this.parseExpr();
 
     this.expect("{");
-    const then = this.parseExpr();
-    this.expect("}");
+    const then = this.parseExprSeq();
 
     this.expect("else");
 
     this.expect("{");
-    const else_ = this.parseExpr();
-    this.expect("}");
+    const else_ = this.parseExprSeq();
 
     return { nodeType: "if", cond, then, else: else_ };
   }

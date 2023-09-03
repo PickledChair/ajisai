@@ -1,0 +1,16 @@
+proc countup(until: i32) {
+    countup_inner(0, until)
+}
+
+proc countup_inner(x: i32, until: i32) {
+    if x <= until {
+        println_i32(x);
+        countup_inner(x + 1, until)
+    } else {
+        ()
+    }
+}
+
+proc main() {
+    countup(10)
+}

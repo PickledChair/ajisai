@@ -109,9 +109,14 @@ Deno.test("parsing let expression test", () => {
         }
       ],
       body: {
-        nodeType: "binary", operator: "+",
-        left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-        right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+        nodeType: "exprSeq",
+        exprs: [
+          {
+            nodeType: "binary", operator: "+",
+            left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+            right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+          }
+        ]
       },
       envId: -1
     }
@@ -132,8 +137,8 @@ Deno.test("parsing if expression test", () => {
         left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
         right: { nodeType: "integer", value: 0 }
       },
-      then: { nodeType: "integer", value: 42 },
-      else: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 }
+      then: { nodeType: "exprSeq", exprs: [{ nodeType: "integer", value: 42 }] },
+      else: { nodeType: "exprSeq", exprs: [{ nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 }] }
     }
   );
 });
@@ -178,9 +183,14 @@ Deno.test("parsing proc definition test", () => {
                 { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
               ],
               body: {
-                nodeType: "binary", operator: "+",
-                left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-                right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                nodeType: "exprSeq",
+                exprs: [
+                  {
+                    nodeType: "binary", operator: "+",
+                    left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+                    right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                  }
+                ]
               },
               envId: -1
             }
@@ -239,7 +249,76 @@ Deno.test("parsing empty main proc test", () => {
             value: {
               nodeType: "proc",
               args: [],
-              body: { nodeType: "unit" },
+              body: { nodeType: "exprSeq", exprs: [{ nodeType: "unit" }] },
+              envId: -1
+            }
+          }
+        }
+      ]
+    }
+  );
+});
+
+Deno.test("parsing proc definition (with expression sequence) test", () => {
+  const lexer = new Lexer("proc add_with_display(a: i32, b: i32) -> i32 { println_i32(a + b); a + b }");
+  const parser = new Parser(lexer);
+  const ast = parser.parse();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "module",
+      defs: [
+        {
+          nodeType: "def",
+          declare: {
+            nodeType: "declare",
+            name: "add_with_display",
+            ty: {
+              tyKind: "proc",
+              procKind: "userdef",
+              argTypes: [
+                {
+                  tyKind: "primitive",
+                  name: "i32",
+                },
+                {
+                  tyKind: "primitive",
+                  name: "i32",
+                },
+              ],
+              bodyType: {
+                tyKind: "primitive",
+                name: "i32",
+              }
+            },
+            value: {
+              nodeType: "proc",
+              args: [
+                { nodeType: "procArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
+                { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
+              ],
+              body: {
+                nodeType: "exprSeq",
+                exprs: [
+                  {
+                    nodeType: "call",
+                    callee: { nodeType: "variable", name: "println_i32", level: -1, fromEnv: -1, toEnv: -1 },
+                    args: [
+                      {
+                        nodeType: "binary", operator: "+",
+                        left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+                        right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                      }
+                    ]
+                  },
+                  {
+                    nodeType: "binary", operator: "+",
+                    left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+                    right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                  }
+                ]
+              },
               envId: -1
             }
           }

@@ -3,6 +3,7 @@ import {
   AstBinaryNode,
   AstCallNode,
   AstExprNode,
+  AstExprSeqNode,
   AstIfNode,
   AstLetNode,
   AstModuleNode,
@@ -87,6 +88,7 @@ const getExprType = (expr: AstExprNode): Type | undefined => {
     case "proc": return expr.bodyTy;
     case "if": return expr.ty;
     case "let": return expr.bodyTy;
+    case "exprSeq": return expr.ty;
     case "call": return expr.ty;
     case "binary": return expr.ty;
     case "unary": return expr.ty;
@@ -115,7 +117,7 @@ class ProcCodeGenerator {
       { inst: "proc_frame.init" },
     ];
 
-    const { prelude, valInst } = this.codegenExpr(this.#procNode.body, defTypeMap);
+    const { prelude, valInst } = this.codegenExprSeq(this.#procNode.body, defTypeMap);
 
     if (prelude) {
       bodyInsts = bodyInsts.concat(prelude);
@@ -306,6 +308,24 @@ class ProcCodeGenerator {
     }
   }
 
+  private codegenExprSeq(ast: AstExprSeqNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACProcBodyInst[] = [];
+    let valInst: ACPushValInst | undefined = undefined;
+
+    ast.exprs.forEach((expr, idx) => {
+      const { prelude: exprPrelude, valInst: exprValInst } = this.codegenExpr(expr, defTypeMap);
+      if (exprPrelude) prelude = prelude.concat(exprPrelude);
+
+      if (idx === ast.exprs.length - 1) {
+        valInst = exprValInst;
+      } else {
+        if (exprValInst) prelude.push(exprValInst);
+      }
+    });
+
+    return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
+  }
+
   private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
     let prelude: ACProcBodyInst[] = [];
 
@@ -319,7 +339,7 @@ class ProcCodeGenerator {
       );
     }
 
-    const { prelude: bodyPrelude, valInst } = this.codegenExpr(ast.body, defTypeMap);
+    const { prelude: bodyPrelude, valInst } = this.codegenExprSeq(ast.body, defTypeMap);
     if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
 
     this.#procCtx.leaveScope();
@@ -341,11 +361,11 @@ class ProcCodeGenerator {
     if (condPrelude) prelude = prelude.concat(condPrelude);
 
     let thenInsts: ACProcBodyInst[] = [];
-    const { prelude: thenPrelude, valInst: thenValInst } = this.codegenExpr(ast.then, defTypeMap);
+    const { prelude: thenPrelude, valInst: thenValInst } = this.codegenExprSeq(ast.then, defTypeMap);
     if (thenPrelude) thenInsts = thenInsts.concat(thenPrelude);
 
     let elseInsts: ACProcBodyInst[] = [];
-    const { prelude: elsePrelude, valInst: elseValInst } = this.codegenExpr(ast.else, defTypeMap);
+    const { prelude: elsePrelude, valInst: elseValInst } = this.codegenExprSeq(ast.else, defTypeMap);
     if (elsePrelude) elseInsts = elseInsts.concat(elsePrelude);
 
     if (isUnitType) {

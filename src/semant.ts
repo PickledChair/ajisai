@@ -1,6 +1,6 @@
 import { VarEnv } from "./env.ts";
 import { Type, PrimitiveType, tyEqual, ProcType } from "./type.ts";
-import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstProcNode, AstCallNode } from "./ast.ts";
+import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstProcNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
 
 export type DefTypeMap = Map<string, Type>;
 
@@ -126,6 +126,17 @@ export class SemanticAnalyzer {
     return [ast, astTy];
   }
 
+  private analyzeExprSeq(ast: AstExprSeqNode, varEnv: VarEnv): [AstExprSeqNode, Type] {
+    const exprs: AstExprNode[] = [];
+    let exprSeqType: Type = { tyKind: "dummy" };
+    for (const expr of ast.exprs) {
+      const [ analyzedExpr, ty ] = this.analyzeExpr(expr, varEnv);
+      exprs.push(analyzedExpr);
+      exprSeqType = ty;
+    }
+    return [{ nodeType: "exprSeq", exprs, ty: exprSeqType }, exprSeqType];
+  }
+
   private analyzeProc(ast: AstProcNode, varEnv: VarEnv): [AstProcNode, ProcType] {
     for (const { name, ty } of ast.args) {
       if (ty) {
@@ -137,7 +148,7 @@ export class SemanticAnalyzer {
         varEnv.setVarTy(name, { tyKind: "dummy" });
       }
     }
-    const [bodyAst, bodyType] = this.analyzeExpr(ast.body, varEnv);
+    const [bodyAst, bodyType] = this.analyzeExprSeq(ast.body, varEnv);
 
     // ここではすでに引数の型が決定しているはず
     const argTypes = ast.args.map(({ name, ty }) => {
@@ -175,6 +186,9 @@ export class SemanticAnalyzer {
       if (varTy.tyKind === "primitive" || varTy.tyKind === "dummy") {
         throw new Error("invalid callee type");
       }
+      if (ast.args.length !== varTy.argTypes.length) {
+        throw new Error(`invalid number of args: expected ${varTy.argTypes.length}, but got ${ast.args.length}`);
+      }
       const args = [];
       for (let i = 0; i < varTy.argTypes.length; i++) {
         const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);
@@ -195,7 +209,7 @@ export class SemanticAnalyzer {
       newDeclares.push(this.analyzeDeclare(declare, varEnv));
     }
 
-    const [bodyAst, bodyTy] = this.analyzeExpr(ast.body, varEnv);
+    const [bodyAst, bodyTy] = this.analyzeExprSeq(ast.body, varEnv);
 
     return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId }, bodyTy];
   }
@@ -222,8 +236,8 @@ export class SemanticAnalyzer {
       throw new Error("condition expression of 'if' must be bool type");
     }
 
-    const [ then, thenTy ] = this.analyzeExpr(ast.then, varEnv);
-    const [ else_, elseTy ] = this.analyzeExpr(ast.else, varEnv);
+    const [ then, thenTy ] = this.analyzeExprSeq(ast.then, varEnv);
+    const [ else_, elseTy ] = this.analyzeExprSeq(ast.else, varEnv);
 
     if (!tyEqual(thenTy, elseTy)) {
       throw new Error("mismatch type between then clause and else clause in if expression");
