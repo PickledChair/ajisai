@@ -4,7 +4,7 @@ export type TokenType =
   | "->"
   | "true" | "false"
   | "else" | "if" | "let" | "proc"
-  | "identifier" | "integer"
+  | "identifier" | "integer" | "string"
   | "eof";
 
 type MutableToken = { tokenType: TokenType, value: string };

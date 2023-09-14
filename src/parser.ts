@@ -316,6 +316,11 @@ export class Parser {
       return { nodeType: "bool", value: token.value == "true" };
     }
 
+    token = this.eat("string");
+    if (token) {
+      return { nodeType: "string", value: token.value };
+    }
+
     token = this.eat("integer");
     if (token) {
       return { nodeType: "integer", value: parseInt(token.value) };

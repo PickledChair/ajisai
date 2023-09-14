@@ -20,6 +20,7 @@ export type ACProcBodyInst =
   ACProcReturnInst |
   ACEnvDefVarInst |
   ACIfElseInst |
+  ACStrMakeStaticInst |
   ACPushValInst;
 
 export type ACEnvDefVarInst = { inst: "env.defvar", envId: number, varName: string, ty: Type, value: ACPushValInst };
@@ -46,7 +47,9 @@ export type ACPushValInst =
   ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
 
-  ACBoolConstInst | ACBoolNotInst | ACBoolEqInst | ACBoolNeInst | ACBoolAndInst | ACBoolOrInst;
+  ACBoolConstInst | ACBoolNotInst | ACBoolEqInst | ACBoolNeInst | ACBoolAndInst | ACBoolOrInst |
+
+  ACStrConstInst;
 
 export type ACBuiltinCallInst = { inst: "builtin.call", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
@@ -71,3 +74,6 @@ export type ACBoolEqInst = { inst: "bool.eq", left: ACPushValInst, right: ACPush
 export type ACBoolNeInst = { inst: "bool.ne", left: ACPushValInst, right: ACPushValInst };
 export type ACBoolAndInst = { inst: "bool.and", left: ACPushValInst, right: ACPushValInst };
 export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPushValInst };
+
+export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string };
+export type ACStrConstInst = { inst: "str.const", id: number };

@@ -6,6 +6,10 @@ const defaultFileHeader = `#include <stdbool.h>
 #include <stdio.h>
 #include <stdint.h>
 
+typedef struct {
+  char *value;
+} AjisaiString;
+
 typedef struct ProcFrame ProcFrame;
 struct ProcFrame {
   ProcFrame *parent;
@@ -17,6 +21,10 @@ void ajisai_println_i32(int32_t value) {
 
 void ajisai_println_bool(bool value) {
   printf("%s\\n", value ? "true" : "false");
+}
+
+void ajisai_println_str(AjisaiString *value) {
+  printf("%s\\n", value->value);
 }
 
 `;
@@ -118,6 +126,9 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
     case "proc.call":
       line = `  ${makePushValLiteral(inst)};\n`;
       break;
+    case "str.make_static":
+      line = `  static AjisaiString static_str${inst.id} = { .value = ${inst.value} };\n`;
+      break;
     default:
       break;
   }
@@ -148,6 +159,8 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
     case "i32.const":
     case "bool.const":
       return `${inst.value}`;
+    case "str.const":
+      return `&static_str${inst.id}`;
     case "i32.add":
       return `(${makePushValLiteral(inst.left)} + ${makePushValLiteral(inst.right)})`;
     case "i32.sub":

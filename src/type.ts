@@ -1,6 +1,6 @@
 export type Type = PrimitiveType | ProcType | DummyType;
 
-const primitiveTypeNames = ["i32", "bool", "()"] as const;
+const primitiveTypeNames = ["i32", "bool", "str", "()"] as const;
 export type PrimitiveTypeName = (typeof primitiveTypeNames)[number];
 export type PrimitiveType = { tyKind: "primitive", name: PrimitiveTypeName };
 
@@ -35,6 +35,7 @@ export const toCType = (ty: Type): string => {
     switch (ty.name) {
       case "i32": return "int32_t";
       case "bool": return "bool";
+      case "str": return "AjisaiString *";
       case "()": return "void";
     }
   } else if (ty.tyKind === "proc") {

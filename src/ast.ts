@@ -3,7 +3,7 @@ import { Type } from "./type.ts";
 export type AstNodeType =
   "module"
   | "def" | "proc" | "procArg" | "declare" | "if" | "let"
-  | "binary" | "unary" | "call" | "bool" | "integer" | "variable" | "unit";
+  | "binary" | "unary" | "call" | "bool" | "integer" | "string" | "variable" | "unit";
 
 export type AstNode = AstModuleNode | AstDefNode | AstProcArgNode | AstDeclareNode | AstExprNode;
 
@@ -12,7 +12,7 @@ export type AstModuleNode = { nodeType: "module", defs: AstDefNode[] };
 export type AstDefNode = { nodeType: "def", declare: AstDeclareNode };
 
 export type AstExprNode = AstExprSeqNode |
-  AstProcNode | AstIfNode | AstLetNode | AstCallNode | AstBinaryNode | AstUnaryNode | AstBoolNode | AstIntegerNode | AstVariableNode | AstUnitNode;
+  AstProcNode | AstIfNode | AstLetNode | AstCallNode | AstBinaryNode | AstUnaryNode | AstBoolNode | AstIntegerNode | AstStringLitNode | AstVariableNode | AstUnitNode;
 
 export type AstExprSeqNode = { nodeType: "exprSeq", exprs: AstExprNode[], ty?: Type };
 
@@ -35,5 +35,6 @@ export type AstCallNode = { nodeType: "call", callee: AstExprNode, args: AstExpr
 
 export type AstUnitNode = { nodeType: "unit" };
 export type AstIntegerNode = { nodeType: "integer", value: number };
+export type AstStringLitNode = { nodeType: "string", value: string };
 export type AstBoolNode = { nodeType: "bool", value: boolean };
 export type AstVariableNode = { nodeType: "variable", name: string, level: number, fromEnv: number, toEnv: number, ty?: Type };

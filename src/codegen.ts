@@ -94,6 +94,7 @@ const getExprType = (expr: AstExprNode): Type | undefined => {
     case "unary": return expr.ty;
     case "bool": return { tyKind: "primitive", name: "bool" };
     case "integer": return { tyKind: "primitive", name: "i32" };
+    case "string": return { tyKind: "primitive", name: "str" };
     case "variable": return expr.ty;
     case "unit": return { tyKind: "primitive", name: "()" };
   }
@@ -176,6 +177,13 @@ class ProcCodeGenerator {
         return { valInst: { inst: "i32.const", value: ast.value } };
       case "bool":
         return { valInst: { inst: "bool.const", value: ast.value } };
+      case "string": {
+        const strId = this.#procCtx.freshProcTmpId;
+        return {
+          prelude: [{ inst: "str.make_static", id: strId, value: ast.value }],
+          valInst: { inst: "str.const", id: strId }
+        };
+      }
       case "unit":
         return {};
       case "variable":

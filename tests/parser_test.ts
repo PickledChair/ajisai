@@ -10,6 +10,23 @@ Deno.test("parsing integer node test", () => {
   assertEquals(ast, { nodeType: "integer", value: 42 });
 });
 
+Deno.test("parsing string node test", () => {
+  const lexer = new Lexer('println_str("Hello, world!")');
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "call",
+      callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+      args: [
+        { nodeType: "string", value: '"Hello, world!"' }
+      ]
+    }
+  );
+});
+
 Deno.test("parsing simple binary node test", () => {
   const lexer = new Lexer("1 + 2");
   const parser = new Parser(lexer);

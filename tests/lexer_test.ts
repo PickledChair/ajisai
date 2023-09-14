@@ -26,6 +26,19 @@ Deno.test("lexing number and operator test", () => {
   }
 });
 
+Deno.test("lexing string literal test", () => {
+  const src = '"hoge" "fuga"';
+  const lexer = new Lexer(src);
+
+  let token;
+
+  const strings = ['"hoge"', '"fuga"'];
+  for (const str of strings) {
+    token = lexer.nextToken();
+    assertEquals(token, { tokenType: "string", value: str });
+  }
+});
+
 Deno.test("skip whitespaces test", () => {
   const src = `
 1  2 34  5 67

@@ -96,6 +96,8 @@ export class Lexer {
         return { tokenType: "{", value: "{" };
       case "}":
         return { tokenType: "}", value: "}" };
+      case '"':
+        return this.readString();
       default:
         if (ch.match(/[1-9]/) || ch === "0" && this.peekChar()?.match(/[^0-9]/)) {
           return this.readNumber(ch);
@@ -138,6 +140,24 @@ export class Lexer {
       return { tokenType: keyword, value: literal };
     }
     return { tokenType: "identifier", value: literal };
+  }
+
+  private readString(): Token {
+    let literal = '"';
+    while (true) {
+      const nextCh = this.peekChar();
+      if (!nextCh) throw new Error("string literal is not closed");
+
+      if (nextCh == '"') {
+        break;
+      } else if (nextCh == "\r" || nextCh == "\n") {
+        throw new Error("string literal cannot contain newline character");
+      }
+
+      literal += this.nextChar();
+    }
+    literal += this.nextChar(); // add '"'
+    return { tokenType: "string", value: literal };
   }
 
   private nextChar(): string | null {

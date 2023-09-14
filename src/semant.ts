@@ -31,6 +31,15 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
       bodyType: { tyKind: "primitive", name: "()" }
     }
   );
+  defTypeMap.set(
+    "println_str",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
   return defTypeMap;
 };
 
@@ -117,6 +126,8 @@ export class SemanticAnalyzer {
       astTy = { tyKind: "primitive", name: "i32" } as PrimitiveType;
     } else if (ast.nodeType === "bool") {
       astTy = { tyKind: "primitive", name: "bool" } as PrimitiveType;
+    } else if (ast.nodeType === "string") {
+      astTy = { tyKind: "primitive", name: "str" } as PrimitiveType;
     } else if (ast.nodeType === "unit") {
       astTy = { tyKind: "primitive", name: "()" } as PrimitiveType;
     } else {
@@ -197,7 +208,7 @@ export class SemanticAnalyzer {
         }
         args.push(argAst);
       }
-      return [{ nodeType: "call", callee: varAst, args }, varTy.bodyType];
+      return [{ nodeType: "call", callee: varAst, args, ty: varTy.bodyType }, varTy.bodyType];
     }
     throw new Error("invalid callee type");
   }
