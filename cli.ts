@@ -44,10 +44,13 @@ if (import.meta.main) {
     const cwd = Deno.cwd();
     const runtimeDir = cwd + "/runtime";
 
-    const args = [...wnos, mainCSourcePath, runtimeDir + "/ajisai_runtime.c", "-I" + runtimeDir];
+    let ccArgs = [
+      ...wnos,
+      mainCSourcePath,
+      runtimeDir + "/ajisai_runtime.c", "-I" + runtimeDir
+    ];
 
     const outputFileName = otherOptions["o"];
-    let ccArgs = args;
     if (outputFileName) {
       ccArgs = ["-o", outputFileName].concat(ccArgs);
     }
