@@ -149,10 +149,20 @@ export class Parser {
 
     this.expect("else");
 
-    this.expect("{");
-    const else_ = this.parseExprSeq();
+    if (this.eat("{")) {
+      const else_ = this.parseExprSeq();
+      return { nodeType: "if", cond, then, else: else_ };
+    }
 
-    return { nodeType: "if", cond, then, else: else_ };
+    if (this.eat("if")) {
+      const nextIf = this.parseIf();
+      return {
+        nodeType: "if", cond, then,
+        else: { nodeType: "exprSeq", exprs: [nextIf] }
+      };
+    }
+
+    throw new Error("Could not parse if expression");
   }
 
   private parseGroup(): AstExprNode {

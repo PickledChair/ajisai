@@ -8,16 +8,12 @@ proc fizzbuzz_iter(cur: i32, end: i32) {
     } else {
         if cur % 15 == 0 {
             println_str("FizzBuzz")
+        } else if cur % 3 == 0 {
+            println_str("Fizz")
+        } else if cur % 5 == 0 {
+            println_str("Buzz")
         } else {
-            if cur % 3 == 0 {
-                println_str("Fizz")
-            } else {
-                if cur % 5 == 0 {
-                    println_str("Buzz")
-                } else {
-                    println_i32(cur)
-                }
-            }
+            println_i32(cur)
         };
         fizzbuzz_iter(cur + 1, end);
     }

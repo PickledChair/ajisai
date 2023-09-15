@@ -160,6 +160,39 @@ Deno.test("parsing if expression test", () => {
   );
 });
 
+Deno.test("parsing 'else if' test", () => {
+  const lexer = new Lexer("if a == 0 { 42 } else if a == 1 { -1 } else { a }");
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "if",
+      cond: {
+        nodeType: "binary", operator: "==",
+        left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+        right: { nodeType: "integer", value: 0 }
+      },
+      then: { nodeType: "exprSeq", exprs: [{ nodeType: "integer", value: 42 }] },
+      else: {
+        nodeType: "exprSeq", exprs: [
+          {
+            nodeType: "if",
+            cond: {
+              nodeType: "binary", operator: "==",
+              left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+              right: { nodeType: "integer", value: 1 }
+            },
+            then: { nodeType: "exprSeq", exprs: [{ nodeType: "unary", operator: "-", operand: { nodeType: "integer", value: 1 } }] },
+            else: { nodeType: "exprSeq", exprs: [{ nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 }] }
+          }
+        ]
+      }
+    }
+  );
+});
+
 Deno.test("parsing proc definition test", () => {
   const lexer = new Lexer("proc add(a: i32, b: i32) -> i32 { a + b }");
   const parser = new Parser(lexer);
