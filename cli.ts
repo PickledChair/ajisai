@@ -41,13 +41,15 @@ if (import.meta.main) {
     console.log(`success: writing to ${mainCSourcePath}`);
 
     const wnos = ["-Wno-parentheses-equality"];
+    const cwd = Deno.cwd();
+    const runtimeDir = cwd + "/runtime";
+
+    const args = [...wnos, mainCSourcePath, runtimeDir + "/ajisai_runtime.c", "-I" + runtimeDir];
 
     const outputFileName = otherOptions["o"];
-    let ccArgs;
+    let ccArgs = args;
     if (outputFileName) {
-      ccArgs = ["-o", outputFileName, ...wnos, mainCSourcePath];
-    } else {
-      ccArgs = [...wnos, mainCSourcePath];
+      ccArgs = ["-o", outputFileName].concat(ccArgs);
     }
 
     const command = new Deno.Command("cc", {

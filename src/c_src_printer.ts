@@ -2,32 +2,7 @@ import { ACEntryInst, ACIfElseInst, ACModuleInst, ACProcBodyInst, ACProcDeclInst
 import { toCType } from "./type.ts";
 import { writeAll } from "https://deno.land/std@0.201.0/streams/write_all.ts";
 
-const defaultFileHeader = `#include <stdbool.h>
-#include <stdio.h>
-#include <stdint.h>
-
-typedef struct {
-  char *value;
-} AjisaiString;
-
-typedef struct ProcFrame ProcFrame;
-struct ProcFrame {
-  ProcFrame *parent;
-};
-
-void ajisai_println_i32(int32_t value) {
-  printf("%d\\n", value);
-}
-
-void ajisai_println_bool(bool value) {
-  printf("%s\\n", value ? "true" : "false");
-}
-
-void ajisai_println_str(AjisaiString *value) {
-  printf("%s\\n", value->value);
-}
-
-`;
+const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
 
 const cMain = `int main(void) {
   ajisai_main();
