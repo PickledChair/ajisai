@@ -111,7 +111,7 @@ void ajisai_mem_manager_deinit(AjisaiMemManager *manager) {
   for (AjisaiMemCellBlock *block = blocks; block != NULL; block = block->next) {
     for (size_t i = 0; i < block->memcell_next_idx; i++) {
       AjisaiMemCell *cell = &block->block[i];
-      if (cell != manager->free.bottom && cell->data  != NULL) {
+      if (cell != manager->free.bottom && cell->data != NULL) {
         // TODO: ここはオブジェクトのタイプごとに解放処理を分岐しなければならない
         free(cell->data);
       }
@@ -177,14 +177,14 @@ void ajisai_println_str(AjisaiString *value) {
 }
 
 AjisaiString *ajisai_concat_str(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b) {
-  size_t a_data_size, b_data_size;
-  a_data_size = strlen(a->value);
-  b_data_size = strlen(b->value);
+  size_t a_str_size, b_str_size;
+  a_str_size = strlen(a->value);
+  b_str_size = strlen(b->value);
 
-  size_t new_data_size = a_data_size + b_data_size + 1;
+  size_t new_data_size = a_str_size + b_str_size + 1;
   char *new_str_data = malloc(new_data_size);
 
   strcpy(new_str_data, a->value);
-  strcpy(new_str_data + a_data_size, b->value);
+  strcpy(new_str_data + a_str_size, b->value);
   return ajisai_string_new(proc_frame, new_str_data);
 }
