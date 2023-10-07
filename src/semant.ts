@@ -40,6 +40,15 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
       bodyType: { tyKind: "primitive", name: "()" }
     }
   );
+  defTypeMap.set(
+    "concat_str",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "str" }
+    }
+  );
   return defTypeMap;
 };
 

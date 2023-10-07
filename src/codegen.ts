@@ -279,6 +279,11 @@ class ProcCodeGenerator {
             prelude: prelude.length === 0 ? undefined : prelude,
             valInst: { inst: "builtin.call", callee: calleeValInst!, args }
           };
+        } else if (varTy.procKind === "builtinWithFrame") {
+          return {
+            prelude: prelude.length === 0 ? undefined : prelude,
+            valInst: { inst: "builtin.call_with_frame", callee: calleeValInst!, args }
+          };
         } else if (varTy.procKind === "userdef") {
           return {
             prelude: prelude.length === 0 ? undefined : prelude,
@@ -302,7 +307,7 @@ class ProcCodeGenerator {
         if (varTy.tyKind === "proc") {
           if (varTy.procKind === "userdef") {
             return { valInst: { inst: "mod_defs.load", varName: ast.name } };
-          } else if (varTy.procKind === "builtin" || varTy.procKind === "builtinWithEnv") {
+          } else if (varTy.procKind === "builtin" || varTy.procKind === "builtinWithFrame") {
             return { valInst: { inst: "builtin.load", varName: ast.name } };
           }
           throw new Error("unreachable");

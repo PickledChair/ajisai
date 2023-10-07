@@ -42,7 +42,7 @@ export type ACPushValInst =
   ACModDefsLoadInst |
   ACEnvLoadInst |
   ACProcFrameLoadTmp |
-  ACBuiltinCallInst | ACProcCallInst |
+  ACBuiltinCallInst | ACBuiltinCallWithFrameInst | ACProcCallInst |
 
   ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
@@ -52,6 +52,7 @@ export type ACPushValInst =
   ACStrConstInst;
 
 export type ACBuiltinCallInst = { inst: "builtin.call", callee: ACPushValInst, args: ACPushValInst[] };
+export type ACBuiltinCallWithFrameInst = { inst: "builtin.call_with_frame", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
 
 export type ACI32ConstInst = { inst: "i32.const", value: number };

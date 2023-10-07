@@ -50,10 +50,16 @@ const printProtoType = async (file: Deno.FsFile, encoder: TextEncoder, procDecl:
 
 const printEntry = async (file: Deno.FsFile, encoder: TextEncoder, entry: ACEntryInst) => {
   await writeAll(file, encoder.encode("void ajisai_main(void) {\n"));
-  await writeAll(file, encoder.encode("  ProcFrame *parent_frame = NULL;\n"));
+  await writeAll(file, encoder.encode("  AjisaiMemManager mem_manager;\n"));
+  // TODO: メモリ確保に失敗した時に終了する処理を入れる
+  await writeAll(file, encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
+  await writeAll(file, encoder.encode("  ProcFrame *parent_frame = &(ProcFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
+
   for (const inst of entry.body) {
     await printProcBodyInst(file, encoder, inst);
   }
+
+  await writeAll(file, encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
   await writeAll(file, encoder.encode("}\n"));
 };
 
@@ -77,7 +83,7 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
 
   switch (inst.inst) {
     case "proc_frame.init":
-      line = `  ProcFrame proc_frame = { .parent = parent_frame };\n`;
+      line = `  ProcFrame proc_frame = { .parent = parent_frame, .mem_manager = parent_frame->mem_manager };\n`;
       break;
     case "proc.return":
       line = `  return ${makePushValLiteral(inst.value)};\n`;
@@ -126,6 +132,7 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       const args = inst.args.map(arg => makePushValLiteral(arg));
       return `${callee}(${args.join(", ")})`;
     }
+    case "builtin.call_with_frame":
     case "proc.call": {
       const callee = makePushValLiteral(inst.callee);
       const args = inst.args.map(arg => makePushValLiteral(arg));
