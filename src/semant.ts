@@ -41,11 +41,21 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     }
   );
   defTypeMap.set(
-    "concat_str",
+    "str_concat",
     {
       tyKind: "proc",
       procKind: "builtinWithFrame",
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "str" }
+    }
+  );
+  defTypeMap.set(
+    "str_slice",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      // TODO: 範囲指定のための数値型は符号なし整数にする
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }, { tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "str" }
     }
   );
@@ -136,6 +146,17 @@ export class SemanticAnalyzer {
     } else if (ast.nodeType === "bool") {
       astTy = { tyKind: "primitive", name: "bool" } as PrimitiveType;
     } else if (ast.nodeType === "string") {
+      // 文字列リテラルのダブルクォートはカウントしないように注意する
+      let idx = 1;
+      let len = 0;
+      while (idx < ast.value.length - 1) {
+        // TODO: エスケープシーケンスについて考慮すべきことを洗い出す
+        if (ast.value.charAt(idx) === "\\")
+          idx++;
+        idx++;
+        len++;
+      }
+      ast.len = len;
       astTy = { tyKind: "primitive", name: "str" } as PrimitiveType;
     } else if (ast.nodeType === "unit") {
       astTy = { tyKind: "primitive", name: "()" } as PrimitiveType;

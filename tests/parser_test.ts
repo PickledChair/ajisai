@@ -21,7 +21,7 @@ Deno.test("parsing string node test", () => {
       nodeType: "call",
       callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
       args: [
-        { nodeType: "string", value: '"Hello, world!"' }
+        { nodeType: "string", value: '"Hello, world!"', len: 0 }
       ]
     }
   );

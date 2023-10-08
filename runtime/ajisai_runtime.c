@@ -1,7 +1,4 @@
 #include "ajisai_runtime.h"
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
 
 static AjisaiMemCellBlock *ajisai_memcell_block_new(size_t memcell_cnt) {
   AjisaiMemCellBlock *block = malloc(sizeof(AjisaiMemCellBlock));
@@ -158,9 +155,13 @@ void *ajisai_malloc(ProcFrame *proc_frame, size_t size) {
   return (void *)cell->data->data;
 }
 
-static AjisaiString *ajisai_string_new(ProcFrame *proc_frame, char *str_data) {
+static AjisaiString *ajisai_str_new(ProcFrame *proc_frame, AjisaiObjTag tag, size_t len, char *str_data, AjisaiString *src) {
   AjisaiString *new_str = ajisai_malloc(proc_frame, sizeof(AjisaiString));
+  new_str->obj_header.tag = tag;
+  // TODO: collect_root_func を設定
+  new_str->len = len;
   new_str->value = str_data;
+  new_str->src = src;
   return new_str;
 }
 
@@ -173,18 +174,44 @@ void ajisai_println_bool(bool value) {
 }
 
 void ajisai_println_str(AjisaiString *value) {
-  printf("%s\n", value->value);
+  printf("%.*s\n", (int)value->len, value->value);
 }
 
-AjisaiString *ajisai_concat_str(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b) {
-  size_t a_str_size, b_str_size;
-  a_str_size = strlen(a->value);
-  b_str_size = strlen(b->value);
+AjisaiString *ajisai_empty_str = &(AjisaiString){
+  .obj_header = { .tag = AJISAI_OBJ_STR_STATIC }, .len = 0, .value = "" };
 
-  size_t new_data_size = a_str_size + b_str_size + 1;
-  char *new_str_data = malloc(new_data_size);
+AjisaiString *ajisai_str_concat(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b) {
+  char *new_str_data;
+  size_t a_str_size, b_str_size, new_str_size;
+  a_str_size = a->len;
+  b_str_size = b->len;
 
-  strcpy(new_str_data, a->value);
-  strcpy(new_str_data + a_str_size, b->value);
-  return ajisai_string_new(proc_frame, new_str_data);
+  if (a_str_size == 0 && b_str_size == 0)
+    return ajisai_empty_str;
+
+  new_str_size = a_str_size + b_str_size;
+  new_str_data = malloc(new_str_size + 1);
+
+  memcpy(new_str_data, a->value, a_str_size);
+  memcpy(new_str_data + a_str_size, b->value, b_str_size);
+  new_str_data[new_str_size] = '\0';
+
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_HEAP, new_str_size, new_str_data, NULL);
+}
+
+AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t start, int32_t end) {
+  if (end - start == 0)
+    return ajisai_empty_str;
+
+  // TODO: Error 型および Result 型の導入時に Error を返すように変更する
+  if (start > end) {
+    fprintf(stderr, "error: end index is larger than start index\n");
+    exit(1);
+  }
+  if (start >= src->len || end > src->len) {
+    fprintf(stderr, "error: index is out of str bounds\n");
+    exit(1);
+  }
+
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_SLICE, end - start, src->value + start, src);
 }

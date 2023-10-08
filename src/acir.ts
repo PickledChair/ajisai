@@ -76,5 +76,5 @@ export type ACBoolNeInst = { inst: "bool.ne", left: ACPushValInst, right: ACPush
 export type ACBoolAndInst = { inst: "bool.and", left: ACPushValInst, right: ACPushValInst };
 export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPushValInst };
 
-export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string };
+export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string, len: number };
 export type ACStrConstInst = { inst: "str.const", id: number };

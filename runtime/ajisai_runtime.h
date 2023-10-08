@@ -54,11 +54,29 @@ struct ProcFrame {
 
 void *ajisai_malloc(ProcFrame *proc_frame, size_t size);
 
-typedef struct {
+typedef enum {
+  AJISAI_OBJ_STR_STATIC,
+  AJISAI_OBJ_STR_HEAP,
+  AJISAI_OBJ_STR_SLICE,
+} AjisaiObjTag;
+
+typedef struct AjisaiObject AjisaiObject;
+ struct AjisaiObject {
+  AjisaiObjTag tag;
+  void (*collect_root_func)(AjisaiObject *);
+};
+
+typedef struct AjisaiString AjisaiString;
+struct AjisaiString {
+  AjisaiObject obj_header;
+  size_t len;
   char *value;
-} AjisaiString;
+  AjisaiString *src;
+};
 
 void ajisai_println_i32(int32_t value);
 void ajisai_println_bool(bool value);
 void ajisai_println_str(AjisaiString *value);
-AjisaiString *ajisai_concat_str(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b);
+AjisaiString *ajisai_str_concat(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b);
+// TODO: 範囲指定のための数値型は符号なし整数にする
+AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t start, int32_t end);

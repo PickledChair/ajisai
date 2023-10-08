@@ -180,7 +180,7 @@ class ProcCodeGenerator {
       case "string": {
         const strId = this.#procCtx.freshProcTmpId;
         return {
-          prelude: [{ inst: "str.make_static", id: strId, value: ast.value }],
+          prelude: [{ inst: "str.make_static", id: strId, value: ast.value, len: ast.len }],
           valInst: { inst: "str.const", id: strId }
         };
       }

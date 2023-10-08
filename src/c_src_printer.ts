@@ -108,7 +108,8 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
       line = `  ${makePushValLiteral(inst)};\n`;
       break;
     case "str.make_static":
-      line = `  static AjisaiString static_str${inst.id} = { .value = ${inst.value} };\n`;
+      // TODO: collect_root_func を設定
+      line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR_STATIC }, .len = ${inst.len}, .value = ${inst.value} };\n`;
       break;
     default:
       break;

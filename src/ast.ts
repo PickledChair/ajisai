@@ -35,6 +35,6 @@ export type AstCallNode = { nodeType: "call", callee: AstExprNode, args: AstExpr
 
 export type AstUnitNode = { nodeType: "unit" };
 export type AstIntegerNode = { nodeType: "integer", value: number };
-export type AstStringLitNode = { nodeType: "string", value: string };
+export type AstStringLitNode = { nodeType: "string", value: string, len: number };
 export type AstBoolNode = { nodeType: "bool", value: boolean };
 export type AstVariableNode = { nodeType: "variable", name: string, level: number, fromEnv: number, toEnv: number, ty?: Type };
