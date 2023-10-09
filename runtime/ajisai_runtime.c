@@ -165,16 +165,35 @@ static AjisaiString *ajisai_str_new(ProcFrame *proc_frame, AjisaiObjTag tag, siz
   return new_str;
 }
 
+void ajisai_print_i32(int32_t value) {
+  printf("%d", value);
+}
+
 void ajisai_println_i32(int32_t value) {
-  printf("%d\n", value);
+  ajisai_print_i32(value);
+  putchar('\n');
+}
+
+void ajisai_print_bool(bool value) {
+  printf("%s", value ? "true" : "false");
 }
 
 void ajisai_println_bool(bool value) {
-  printf("%s\n", value ? "true" : "false");
+  ajisai_print_bool(value);
+  putchar('\n');
+}
+
+void ajisai_print_str(AjisaiString *value) {
+  printf("%.*s", (int)value->len, value->value);
 }
 
 void ajisai_println_str(AjisaiString *value) {
-  printf("%.*s\n", (int)value->len, value->value);
+  ajisai_print_str(value);
+  putchar('\n');
+}
+
+void ajisai_flush(void) {
+  fflush(stdout);
 }
 
 AjisaiString *ajisai_empty_str = &(AjisaiString){
@@ -182,21 +201,21 @@ AjisaiString *ajisai_empty_str = &(AjisaiString){
 
 AjisaiString *ajisai_str_concat(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b) {
   char *new_str_data;
-  size_t a_str_size, b_str_size, new_str_size;
-  a_str_size = a->len;
-  b_str_size = b->len;
+  size_t a_str_len, b_str_len, new_str_len;
+  a_str_len = a->len;
+  b_str_len = b->len;
 
-  if (a_str_size == 0 && b_str_size == 0)
+  if (a_str_len == 0 && b_str_len == 0)
     return ajisai_empty_str;
 
-  new_str_size = a_str_size + b_str_size;
-  new_str_data = malloc(new_str_size + 1);
+  new_str_len = a_str_len + b_str_len;
+  new_str_data = malloc(new_str_len + 1);
 
-  memcpy(new_str_data, a->value, a_str_size);
-  memcpy(new_str_data + a_str_size, b->value, b_str_size);
-  new_str_data[new_str_size] = '\0';
+  memcpy(new_str_data, a->value, a_str_len);
+  memcpy(new_str_data + a_str_len, b->value, b_str_len);
+  new_str_data[new_str_len] = '\0';
 
-  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_HEAP, new_str_size, new_str_data, NULL);
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_HEAP, new_str_len, new_str_data, NULL);
 }
 
 AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t start, int32_t end) {
@@ -214,4 +233,24 @@ AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t
   }
 
   return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_SLICE, end - start, src->value + start, src);
+}
+
+bool ajisai_str_equal(AjisaiString *left, AjisaiString *right) {
+  if (left->len != right->len)
+    return false;
+  return memcmp(left->value, right->value, left->len) == 0;
+}
+
+AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_t count) {
+  if (count == 0)
+    return ajisai_empty_str;
+
+  size_t new_str_len = src->len * count;
+  char *new_str_data = malloc(new_str_len + 1);
+
+  for (int32_t i = 0; i < count; i++)
+    memcpy(new_str_data + src->len * i, src->value, src->len);
+  new_str_data[new_str_len] = '\0';
+
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_HEAP, new_str_len, new_str_data, NULL);
 }

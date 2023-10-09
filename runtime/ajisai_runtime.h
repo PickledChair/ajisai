@@ -74,9 +74,17 @@ struct AjisaiString {
   AjisaiString *src;
 };
 
+void ajisai_print_i32(int32_t value);
 void ajisai_println_i32(int32_t value);
+void ajisai_print_bool(bool value);
 void ajisai_println_bool(bool value);
+void ajisai_print_str(AjisaiString *value);
 void ajisai_println_str(AjisaiString *value);
+void ajisai_flush(void);
+
 AjisaiString *ajisai_str_concat(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b);
 // TODO: 範囲指定のための数値型は符号なし整数にする
 AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t start, int32_t end);
+bool ajisai_str_equal(AjisaiString *left, AjisaiString *right);
+// TODO: 反復回数指定のための数値型は符号なし整数にする
+AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_t count);

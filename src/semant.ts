@@ -14,11 +14,29 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     }
   }
   defTypeMap.set(
+    "print_i32",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
     "println_i32",
     {
       tyKind: "proc",
       procKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
+    "print_bool",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "bool" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
   );
@@ -32,11 +50,29 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     }
   );
   defTypeMap.set(
+    "print_str",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
     "println_str",
     {
       tyKind: "proc",
       procKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
+    "flush",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [],
       bodyType: { tyKind: "primitive", name: "()" }
     }
   );
@@ -56,6 +92,25 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
       procKind: "builtinWithFrame",
       // TODO: 範囲指定のための数値型は符号なし整数にする
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }, { tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "str" }
+    }
+  );
+  defTypeMap.set(
+    "str_equal",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "bool" }
+    }
+  );
+  defTypeMap.set(
+    "str_repeat",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      // TODO: 反復回数指定のための数値型は符号なし整数にする
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "str" }
     }
   );
