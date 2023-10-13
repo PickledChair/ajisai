@@ -117,6 +117,7 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
       await printIfElse(file, encoder, inst);
       return;
     case "builtin.call":
+    case "builtin.call_with_frame":
     case "proc.call":
       line = `  ${makePushValLiteral(inst)};\n`;
       break;
