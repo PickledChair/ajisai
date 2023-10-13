@@ -9,7 +9,7 @@ export class VarEnv {
   parent_?: VarEnv;
   envKind: EnvKind;
   #variables: Map<string, Type> = new Map();
-  #rootIndices: number[] = [];
+  // #rootIndices: number[] = [];
   #freshRootId = 0;
 
   constructor(envKind: EnvKind, parent?: VarEnv) {
@@ -31,13 +31,13 @@ export class VarEnv {
 
   freshRootId(): number {
     const freshId = this.incrementTmpId();
-    this.#rootIndices.push(freshId);
+    // this.#rootIndices.push(freshId);
     return freshId;
   }
 
-  get rootIndices(): number[] {
-    return this.#rootIndices.sort((a, b) => b - a);
-  }
+  // get rootIndices(): number[] {
+  //   return this.#rootIndices.sort((a, b) => b - a);
+  // }
 
   get rootTableSize(): number {
     return this.#freshRootId;

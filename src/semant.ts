@@ -319,7 +319,7 @@ export class SemanticAnalyzer {
 
     const [bodyAst, bodyTy] = this.analyzeExprSeq(ast.body, varEnv);
 
-    return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId, rootIndices: varEnv.rootIndices }, bodyTy];
+    return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId }, bodyTy];
   }
 
   private analyzeDeclare(ast: AstDeclareNode, varEnv: VarEnv): AstDeclareNode {

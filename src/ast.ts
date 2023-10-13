@@ -19,7 +19,7 @@ export type AstExprSeqNode = { nodeType: "exprSeq", exprs: AstExprNode[], ty?: T
 export type AstProcNode = { nodeType: "proc", args: AstProcArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type, rootTableSize?: number };
 export type AstProcArgNode = { nodeType: "procArg", name: string, ty?: Type };
 
-export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number, rootIndices?: number[] };
+export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number };
 
 export type AstDeclareNode = { nodeType: "declare", name: string, ty?: Type, value: AstExprNode };
 

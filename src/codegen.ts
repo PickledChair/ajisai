@@ -365,12 +365,6 @@ class ProcCodeGenerator {
     const { prelude: bodyPrelude, valInst } = this.codegenExprSeq(ast.body, defTypeMap);
     if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
 
-    // if (ast.rootIndices!.length !== 0) {
-    //   for (const idx of ast.rootIndices!) {
-    //     const unregInst: ACProcBodyInst = { inst: "root_table.unreg", idx };
-    //     prelude.push(unregInst);
-    //   }
-    // }
     this.#procCtx.leaveScope();
     return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
   }
