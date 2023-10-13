@@ -123,16 +123,6 @@ int ajisai_mem_manager_init(AjisaiMemManager *manager) {
   manager->gc_in_progress = false;
 
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
-  size_t free_cnt, new_cnt, to_cnt, from_cnt;
-
-  for (AjisaiMemCell *cell = manager->free.memcells; cell != NULL; cell = cell->next) free_cnt++;
-  assert(free_cnt == 0);
-  for (AjisaiMemCell *cell = manager->free.new_edge.prev; cell != manager->scan; cell = cell->prev) new_cnt++;
-  assert(new_cnt == 0);
-  for (AjisaiMemCell *cell = manager->scan; cell != manager->top; cell = cell->prev) to_cnt++;
-  assert(to_cnt == 0);
-  for (AjisaiMemCell *cell = manager->top; cell != manager->free.bottom; cell = cell->prev) from_cnt++;
-  assert(from_cnt == 0);
   ajisai_mem_manager_display_stat(manager);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   return 0;
