@@ -8,7 +8,7 @@ export const isPrimitiveTypeName = (s: string): PrimitiveTypeName | null => {
   return (primitiveTypeNames as Readonly<string[]>).includes(s) ? s as PrimitiveTypeName : null;
 };
 
-export type ProcKind = "userdef" | "builtin" | "builtinWithEnv";
+export type ProcKind = "userdef" | "builtin" | "builtinWithFrame";
 export type ProcType = { tyKind: "proc", procKind: ProcKind, argTypes: Type[], bodyType: Type };
 
 export type DummyType = { tyKind: "dummy" };
@@ -42,4 +42,19 @@ export const toCType = (ty: Type): string => {
     throw new Error("unimplemented for proc");
   }
   throw new Error("invalid type");
+};
+
+export const mayBeHeapObj = (ty: Type): boolean => {
+  if (ty.tyKind === "primitive") {
+    switch (ty.name) {
+      case "i32":
+      case "bool":
+      case "()":
+        return false;
+      case "str":
+        return true;
+    }
+  }
+  // proc 等
+  return true;
 };

@@ -144,18 +144,22 @@ export class Lexer {
 
   private readString(): Token {
     let literal = '"';
+    let prevCh = '\0';
+
     while (true) {
       const nextCh = this.peekChar();
       if (!nextCh) throw new Error("string literal is not closed");
 
-      if (nextCh == '"') {
+      if (nextCh == '"' && prevCh != '\\') {
         break;
       } else if (nextCh == "\r" || nextCh == "\n") {
         throw new Error("string literal cannot contain newline character");
       }
 
+      prevCh = nextCh;
       literal += this.nextChar();
     }
+
     literal += this.nextChar(); // add '"'
     return { tokenType: "string", value: literal };
   }

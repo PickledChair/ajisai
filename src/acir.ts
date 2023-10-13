@@ -16,6 +16,7 @@ export type ACProcDefInst = {
 };
 
 export type ACProcBodyInst =
+  ACRootTableInitInst | ACRootTableRegInst | ACRootTableUnregInst |
   ACProcFrameInitInst | ACProcFrameDefTmp | ACProcFrameDefTmpNoVal | ACProcFrameStoreTmp |
   ACProcReturnInst |
   ACEnvDefVarInst |
@@ -28,11 +29,16 @@ export type ACEnvLoadInst = { inst: "env.load", envId: number, varName: string }
 export type ACModDefsLoadInst = { inst: "mod_defs.load", varName: string };
 export type ACBuiltinLoadInst = { inst: "builtin.load", varName: string };
 
-export type ACProcFrameInitInst = { inst: "proc_frame.init" }
+export type ACRootTableInitInst = { inst: "root_table.init", size: number };
+export type ACRootTableRegInst = { inst: "root_table.reg", envId: number, rootTableIdx: number, tmpVarIdx: number };
+export type ACRootTableUnregInst = { inst: "root_table.unreg", idx: number };
+
+export type ACProcFrameInitInst = { inst: "proc_frame.init", rootTableSize: number };
 export type ACProcFrameDefTmp = { inst: "proc_frame.deftmp", envId: number, idx: number, ty: Type, value: ACPushValInst };
 export type ACProcFrameDefTmpNoVal = { inst: "proc_frame.deftmp_noval", envId: number, idx: number, ty: Type };
 export type ACProcFrameLoadTmp = { inst: "proc_frame.load_tmp", envId: number, idx: number };
 export type ACProcFrameStoreTmp = { inst: "proc_frame.store_tmp", envId: number, idx: number, value: ACPushValInst };
+
 export type ACProcReturnInst = { inst: "proc.return", value: ACPushValInst };
 
 export type ACIfElseInst = { inst: "ifelse", cond: ACPushValInst, then: ACProcBodyInst[], else: ACProcBodyInst[] };
@@ -42,7 +48,7 @@ export type ACPushValInst =
   ACModDefsLoadInst |
   ACEnvLoadInst |
   ACProcFrameLoadTmp |
-  ACBuiltinCallInst | ACProcCallInst |
+  ACBuiltinCallInst | ACBuiltinCallWithFrameInst | ACProcCallInst |
 
   ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
@@ -52,6 +58,7 @@ export type ACPushValInst =
   ACStrConstInst;
 
 export type ACBuiltinCallInst = { inst: "builtin.call", callee: ACPushValInst, args: ACPushValInst[] };
+export type ACBuiltinCallWithFrameInst = { inst: "builtin.call_with_frame", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
 
 export type ACI32ConstInst = { inst: "i32.const", value: number };
@@ -75,5 +82,5 @@ export type ACBoolNeInst = { inst: "bool.ne", left: ACPushValInst, right: ACPush
 export type ACBoolAndInst = { inst: "bool.and", left: ACPushValInst, right: ACPushValInst };
 export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPushValInst };
 
-export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string };
+export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string, len: number };
 export type ACStrConstInst = { inst: "str.const", id: number };

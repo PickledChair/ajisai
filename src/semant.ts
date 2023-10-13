@@ -1,5 +1,5 @@
 import { VarEnv } from "./env.ts";
-import { Type, PrimitiveType, tyEqual, ProcType } from "./type.ts";
+import { Type, PrimitiveType, tyEqual, mayBeHeapObj, ProcType } from "./type.ts";
 import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstProcNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
 
 export type DefTypeMap = Map<string, Type>;
@@ -14,11 +14,29 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     }
   }
   defTypeMap.set(
+    "print_i32",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
     "println_i32",
     {
       tyKind: "proc",
       procKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
+    "print_bool",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "bool" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
   );
@@ -32,11 +50,76 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     }
   );
   defTypeMap.set(
+    "print_str",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
     "println_str",
     {
       tyKind: "proc",
       procKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
+    "flush",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
+  defTypeMap.set(
+    "str_concat",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "str" }
+    }
+  );
+  defTypeMap.set(
+    "str_slice",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      // TODO: 範囲指定のための数値型は符号なし整数にする
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }, { tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "str" }
+    }
+  );
+  defTypeMap.set(
+    "str_equal",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "bool" }
+    }
+  );
+  defTypeMap.set(
+    "str_repeat",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      // TODO: 反復回数指定のための数値型は符号なし整数にする
+      argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }],
+      bodyType: { tyKind: "primitive", name: "str" }
+    }
+  );
+  defTypeMap.set(
+    "gc_start",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      argTypes: [],
       bodyType: { tyKind: "primitive", name: "()" }
     }
   );
@@ -60,7 +143,7 @@ export class SemanticAnalyzer {
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
-    const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv());
+    const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
     if (ast.declare.ty) {
       if (tyEqual(ast.declare.ty, exprTy)) {
         return {
@@ -85,15 +168,18 @@ export class SemanticAnalyzer {
     let astTy;
 
     if (ast.nodeType === "proc") {
-      const [node, ty] = this.analyzeProc(ast, new VarEnv(varEnv));
+      const [node, ty] = this.analyzeProc(ast, new VarEnv("proc", varEnv));
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "call") {
       const [node, ty] = this.analyzeCall(ast, varEnv);
+      if (mayBeHeapObj(ty)) {
+        node.rootIdx = varEnv.freshRootId();
+      }
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "let") {
-      const [node, ty] = this.analyzeLet(ast, new VarEnv(varEnv));
+      const [node, ty] = this.analyzeLet(ast, new VarEnv("let", varEnv));
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "if") {
@@ -127,6 +213,17 @@ export class SemanticAnalyzer {
     } else if (ast.nodeType === "bool") {
       astTy = { tyKind: "primitive", name: "bool" } as PrimitiveType;
     } else if (ast.nodeType === "string") {
+      // 文字列リテラルのダブルクォートはカウントしないように注意する
+      let idx = 1;
+      let len = 0;
+      while (idx < ast.value.length - 1) {
+        // TODO: エスケープシーケンスについて考慮すべきことを洗い出す
+        if (ast.value.charAt(idx) === "\\")
+          idx++;
+        idx++;
+        len++;
+      }
+      ast.len = len;
       astTy = { tyKind: "primitive", name: "str" } as PrimitiveType;
     } else if (ast.nodeType === "unit") {
       astTy = { tyKind: "primitive", name: "()" } as PrimitiveType;
@@ -174,14 +271,14 @@ export class SemanticAnalyzer {
       }
     });
     return [
-      { nodeType: "proc", args: ast.args, body: bodyAst, envId: varEnv.envId, bodyTy: bodyType },
+      { nodeType: "proc", args: ast.args, body: bodyAst, envId: varEnv.envId, bodyTy: bodyType, rootTableSize: varEnv.rootTableSize },
       { tyKind: "proc", procKind: "userdef", argTypes, bodyType }
     ];
   }
 
   private analyzeCall(ast: AstCallNode, varEnv: VarEnv): [AstCallNode, Type] {
     if (ast.callee.nodeType === "proc") {
-      const [procAst, procTy] = this.analyzeProc(ast.callee, new VarEnv(varEnv));
+      const [procAst, procTy] = this.analyzeProc(ast.callee, new VarEnv("proc", varEnv));
       const args = [];
       for (let i = 0; i < procTy.argTypes.length; i++) {
         const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);

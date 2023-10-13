@@ -16,7 +16,7 @@ export type AstExprNode = AstExprSeqNode |
 
 export type AstExprSeqNode = { nodeType: "exprSeq", exprs: AstExprNode[], ty?: Type };
 
-export type AstProcNode = { nodeType: "proc", args: AstProcArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type };
+export type AstProcNode = { nodeType: "proc", args: AstProcArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type, rootTableSize?: number };
 export type AstProcArgNode = { nodeType: "procArg", name: string, ty?: Type };
 
 export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number };
@@ -31,10 +31,10 @@ export type AstBinaryNode = { nodeType: "binary", operator: BinOpKind, left: Ast
 export type UnOpKind = "-" | "!";
 export type AstUnaryNode = { nodeType: "unary", operator: UnOpKind, operand: AstExprNode, ty?: Type };
 
-export type AstCallNode = { nodeType: "call", callee: AstExprNode, args: AstExprNode[], ty?: Type };
+export type AstCallNode = { nodeType: "call", callee: AstExprNode, args: AstExprNode[], ty?: Type, rootIdx?: number };
 
 export type AstUnitNode = { nodeType: "unit" };
 export type AstIntegerNode = { nodeType: "integer", value: number };
-export type AstStringLitNode = { nodeType: "string", value: string };
+export type AstStringLitNode = { nodeType: "string", value: string, len: number };
 export type AstBoolNode = { nodeType: "bool", value: boolean };
 export type AstVariableNode = { nodeType: "variable", name: string, level: number, fromEnv: number, toEnv: number, ty?: Type };

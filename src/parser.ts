@@ -328,7 +328,7 @@ export class Parser {
 
     token = this.eat("string");
     if (token) {
-      return { nodeType: "string", value: token.value };
+      return { nodeType: "string", value: token.value, len: 0 };
     }
 
     token = this.eat("integer");
