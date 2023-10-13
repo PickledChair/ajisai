@@ -62,6 +62,7 @@ static AjisaiMemCell *ajisai_memcell_allocator_alloc(AjisaiMemCellAllocator *all
       if (allocate_block)
         *allocate_block = true;
     }
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
     printf("[MEMORY MANAGER DEBUG] add block at memcell allocator\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -83,10 +84,12 @@ static int ajisai_free_memcells_init(AjisaiFreeMemCells *free_memcells, AjisaiMe
 
 static AjisaiMemCell *ajisai_free_memcells_pop_memcell(AjisaiFreeMemCells *free_memcells, size_t size) {
   AjisaiMemCell *prev;
+
   for (AjisaiMemCell *cell = free_memcells->memcells; cell != NULL; cell = cell->next) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
     printf("[MEMORY MANAGER DEBUG] \tfound free memcell's size: %zu (%zu required)\n", cell->size, size);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
     if (cell->size == size) {
       if (cell == free_memcells->memcells) {
         free_memcells->memcells = cell->next;
@@ -125,6 +128,7 @@ int ajisai_mem_manager_init(AjisaiMemManager *manager) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   ajisai_mem_manager_display_stat(manager);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   return 0;
 }
 
@@ -146,10 +150,12 @@ void ajisai_mem_manager_deinit(AjisaiMemManager *manager) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] mem_manager_deinit start\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   for (AjisaiMemCellBlock *block = blocks; block != NULL; block = block->next) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
     printf("[MEMORY MANAGER DEBUG] \tblock %p, block size %zu (* %lu)\n", block, block->memcell_next_idx, sizeof(AjisaiMemCell));
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
     for (size_t i = 0; i < block->memcell_next_idx; i++) {
       AjisaiMemCell *cell = &block->block[i];
       if (cell != manager->free.bottom && cell->data != NULL) {
@@ -160,6 +166,7 @@ void ajisai_mem_manager_deinit(AjisaiMemManager *manager) {
     }
   }
   ajisai_memcell_allocator_deinit(&manager->memcell_allocator);
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] mem_manager_deinit end\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -196,6 +203,7 @@ static void ajisai_mem_manager_append_to_new_space(AjisaiMemManager *manager, Aj
 
   manager->free.new_edge.prev = cell;
   cell->next = &manager->free.new_edge;
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] grow new-space\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -217,6 +225,7 @@ static void ajisai_mem_manager_append_to_from_space(AjisaiMemManager *manager, A
   // 初期状態では top は 前の bottom が指していた cell の方を指し続けているため、
   // From 空間が拡大する
   manager->free.bottom = cell;
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   assert(cell != NULL);
   assert(manager->free.bottom != manager->top);
@@ -228,6 +237,7 @@ void ajisai_mem_manager_append_to_to_space(AjisaiMemManager *manager, AjisaiMemC
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   AjisaiMemCell *prev_scan = manager->scan;
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   if (cell == manager->scan)
     return;
   // scan セルの次のセルの直前に cell を接続
@@ -240,6 +250,7 @@ void ajisai_mem_manager_append_to_to_space(AjisaiMemManager *manager, AjisaiMemC
 
   // scan ポインタを cell を指すように更新
   manager->scan = cell;
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   assert(cell != NULL);
   assert(manager->scan != prev_scan);
@@ -252,19 +263,23 @@ static int ajisai_mem_manager_scan_obj_tree(AjisaiMemManager *manager) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] scan_obj_tree ...\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   if (manager->scan == manager->top) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] scan_obj_tree finished\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
     return 1;
   }
 
   AjisaiObject *obj = (AjisaiObject *)manager->scan->data->data;
   obj->type_info->scan_func(manager, obj);
   manager->scan = manager->scan->prev;
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] scan_obj_tree continue\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   return 0;
 }
 
@@ -274,6 +289,7 @@ static void ajisai_mem_manager_release_from_space(AjisaiMemManager *manager) {
   printf("[MEMORY MANAGER DEBUG] release_from_space start\n");
   int released_cell_count = 0;
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   while (manager->top != manager->free.bottom && manager->top->prev != manager->free.bottom) {
     AjisaiMemCell *released = manager->top->prev;
 
@@ -285,10 +301,12 @@ static void ajisai_mem_manager_release_from_space(AjisaiMemManager *manager) {
 
     released->next = manager->free.memcells;
     manager->free.memcells = released;
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
     released_cell_count++;
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   }
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] release_from_space end (%d cells released)\n", released_cell_count);
   size_t freecells_cnt = 0;
@@ -306,22 +324,26 @@ static void ajisai_proc_frame_scan_roots(ProcFrame *proc_frame) {
   printf("[MEMORY MANAGER DEBUG] scan_roots start\n");
   int scanned_cell_count = 0;
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   for (ProcFrame *frame = proc_frame; frame != NULL; frame = frame->parent) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
     printf("[MEMORY MANAGER DEBUG] \tscanning frame %p ...\n", frame);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
     for (size_t i = 0; i < frame->root_table_size; i++) {
       AjisaiObject *obj = frame->root_table[i];
       if (obj != NULL && !AJISAI_OBJ_IS_STATIC(obj)) {
         AjisaiMemCell *cell = AJISAI_OBJ_GET_OWNER_CELL(obj);
         AJISAI_MEMCELL_POP_OWN(manager, cell);
         ajisai_mem_manager_append_to_to_space(manager, cell);
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
         scanned_cell_count++;
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
       }
     }
   }
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] scan_roots end (%d cells going to to-space)\n", scanned_cell_count);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -365,9 +387,11 @@ AjisaiObject *ajisai_object_alloc(ProcFrame *proc_frame, size_t size) {
     // cell は今提供しようとしている有効なバイトデータをまだ保持しているので
     // これの指すデータを戻り値として返す。メタデータの部分は取り除いている
   }
+
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   ajisai_mem_manager_display_stat(mem_manager);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
+
   return (AjisaiObject *)cell->data->data;
 }
 
