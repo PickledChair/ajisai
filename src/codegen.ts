@@ -12,7 +12,7 @@ import {
   AstVariableNode
 } from "./ast.ts";
 import { DefTypeMap } from "./semant.ts";
-import { PrimitiveType, ProcType, Type, tyEqual } from "./type.ts";
+import { PrimitiveType, ProcType, Type, mayBeHeapObj, tyEqual } from "./type.ts";
 
 export class CodeGenerator {
   #module: AstModuleNode;
@@ -114,9 +114,11 @@ class ProcCodeGenerator {
   codegen(defTypeMap: DefTypeMap): [ACProcDeclInst | undefined, ACProcDefInst | ACEntryInst] {
     const procDeclInst = this.makeProcDeclInst();
 
-    let bodyInsts: ACProcBodyInst[]  = [
-      { inst: "proc_frame.init" },
-    ];
+    let bodyInsts: ACProcBodyInst[]  = [];
+    if (this.#procNode.rootTableSize! > 0) {
+      bodyInsts.push({ inst: "root_table.init", size: this.#procNode.rootTableSize! });
+    }
+    bodyInsts.push({ inst: "proc_frame.init", rootTableSize: this.#procNode.rootTableSize! });
 
     const { prelude, valInst } = this.codegenExprSeq(this.#procNode.body, defTypeMap);
 
@@ -274,24 +276,31 @@ class ProcCodeGenerator {
     if (ast.callee.nodeType === "variable") {
       const varTy = defTypeMap.get(ast.callee.name);
       if (varTy && varTy.tyKind === "proc") {
+        let valInst: ACPushValInst;
+
         if (varTy.procKind === "builtin") {
-          return {
-            prelude: prelude.length === 0 ? undefined : prelude,
-            valInst: { inst: "builtin.call", callee: calleeValInst!, args }
-          };
+          valInst = { inst: "builtin.call", callee: calleeValInst!, args };
         } else if (varTy.procKind === "builtinWithFrame") {
-          return {
-            prelude: prelude.length === 0 ? undefined : prelude,
-            valInst: { inst: "builtin.call_with_frame", callee: calleeValInst!, args }
-          };
+          valInst = { inst: "builtin.call_with_frame", callee: calleeValInst!, args };
         } else if (varTy.procKind === "userdef") {
-          return {
-            prelude: prelude.length === 0 ? undefined : prelude,
-            valInst: { inst: "proc.call", callee: calleeValInst!, args }
-          };
+          valInst = { inst: "proc.call", callee: calleeValInst!, args };
         } else {
           throw new Error("unimplemented for other proc type");
         }
+
+        if (mayBeHeapObj(varTy.bodyType)) {
+          const tmpId = this.#procCtx.freshProcTmpId;
+
+          const defTmpInst: ACProcBodyInst = { inst: "proc_frame.deftmp", envId: this.#procCtx.procEnvId, idx: tmpId, ty: ast.ty!, value: valInst };
+          prelude.push(defTmpInst);
+
+          const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: this.#procCtx.procEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
+          prelude.push(rootRegInst);
+
+          valInst = { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: tmpId };
+        }
+
+        return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
       } else {
         throw new Error("unreachable");
       }
@@ -356,6 +365,12 @@ class ProcCodeGenerator {
     const { prelude: bodyPrelude, valInst } = this.codegenExprSeq(ast.body, defTypeMap);
     if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
 
+    // if (ast.rootIndices!.length !== 0) {
+    //   for (const idx of ast.rootIndices!) {
+    //     const unregInst: ACProcBodyInst = { inst: "root_table.unreg", idx };
+    //     prelude.push(unregInst);
+    //   }
+    // }
     this.#procCtx.leaveScope();
     return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
   }

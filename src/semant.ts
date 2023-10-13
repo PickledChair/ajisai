@@ -1,5 +1,5 @@
 import { VarEnv } from "./env.ts";
-import { Type, PrimitiveType, tyEqual, ProcType } from "./type.ts";
+import { Type, PrimitiveType, tyEqual, mayBeHeapObj, ProcType } from "./type.ts";
 import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstProcNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
 
 export type DefTypeMap = Map<string, Type>;
@@ -114,6 +114,15 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
       bodyType: { tyKind: "primitive", name: "str" }
     }
   );
+  defTypeMap.set(
+    "gc_start",
+    {
+      tyKind: "proc",
+      procKind: "builtinWithFrame",
+      argTypes: [],
+      bodyType: { tyKind: "primitive", name: "()" }
+    }
+  );
   return defTypeMap;
 };
 
@@ -134,7 +143,7 @@ export class SemanticAnalyzer {
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
-    const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv());
+    const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
     if (ast.declare.ty) {
       if (tyEqual(ast.declare.ty, exprTy)) {
         return {
@@ -159,15 +168,18 @@ export class SemanticAnalyzer {
     let astTy;
 
     if (ast.nodeType === "proc") {
-      const [node, ty] = this.analyzeProc(ast, new VarEnv(varEnv));
+      const [node, ty] = this.analyzeProc(ast, new VarEnv("proc", varEnv));
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "call") {
       const [node, ty] = this.analyzeCall(ast, varEnv);
+      if (mayBeHeapObj(ty)) {
+        node.rootIdx = varEnv.freshRootId();
+      }
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "let") {
-      const [node, ty] = this.analyzeLet(ast, new VarEnv(varEnv));
+      const [node, ty] = this.analyzeLet(ast, new VarEnv("let", varEnv));
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "if") {
@@ -259,14 +271,14 @@ export class SemanticAnalyzer {
       }
     });
     return [
-      { nodeType: "proc", args: ast.args, body: bodyAst, envId: varEnv.envId, bodyTy: bodyType },
+      { nodeType: "proc", args: ast.args, body: bodyAst, envId: varEnv.envId, bodyTy: bodyType, rootTableSize: varEnv.rootTableSize },
       { tyKind: "proc", procKind: "userdef", argTypes, bodyType }
     ];
   }
 
   private analyzeCall(ast: AstCallNode, varEnv: VarEnv): [AstCallNode, Type] {
     if (ast.callee.nodeType === "proc") {
-      const [procAst, procTy] = this.analyzeProc(ast.callee, new VarEnv(varEnv));
+      const [procAst, procTy] = this.analyzeProc(ast.callee, new VarEnv("proc", varEnv));
       const args = [];
       for (let i = 0; i < procTy.argTypes.length; i++) {
         const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);
@@ -307,7 +319,7 @@ export class SemanticAnalyzer {
 
     const [bodyAst, bodyTy] = this.analyzeExprSeq(ast.body, varEnv);
 
-    return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId }, bodyTy];
+    return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId, rootIndices: varEnv.rootIndices }, bodyTy];
   }
 
   private analyzeDeclare(ast: AstDeclareNode, varEnv: VarEnv): AstDeclareNode {

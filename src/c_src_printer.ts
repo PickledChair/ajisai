@@ -82,8 +82,21 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
   let line = "";
 
   switch (inst.inst) {
+    case "root_table.init":
+      line = `  AjisaiObject *root_table[${inst.size}] = {};\n`;
+      break;
+    case "root_table.reg":
+      line = `  root_table[${inst.rootTableIdx}] = (AjisaiObject *)env${inst.envId}_tmp${inst.tmpVarIdx};\n`;
+      break;
+    case "root_table.unreg":
+      line = `  root_table[${inst.idx}] = NULL;\n`;
+      break;
     case "proc_frame.init":
-      line = `  ProcFrame proc_frame = { .parent = parent_frame, .mem_manager = parent_frame->mem_manager };\n`;
+      line = `  ProcFrame proc_frame = { .parent = parent_frame, .mem_manager = parent_frame->mem_manager, .root_table_size = ${inst.rootTableSize}`;
+      if (inst.rootTableSize > 0) {
+        line += ", .root_table = root_table";
+      }
+      line += " };\n";
       break;
     case "proc.return":
       line = `  return ${makePushValLiteral(inst.value)};\n`;
@@ -109,7 +122,7 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
       break;
     case "str.make_static":
       // TODO: collect_root_func を設定
-      line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR_STATIC }, .len = ${inst.len}, .value = ${inst.value} };\n`;
+      line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR_STATIC }, .len = ${inst.len}, .value = ${inst.value} };\n  static_str${inst.id}.obj_header.type_info = ajisai_str_type_info();\n`;
       break;
     default:
       break;

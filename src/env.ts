@@ -2,15 +2,45 @@ import { Type } from "./type.ts";
 
 let freshEnvId = 0;
 
+export type EnvKind = "module" | "proc" | "let";
+
 export class VarEnv {
   envId: number;
   parent_?: VarEnv;
-  #variables: Map<string, Type>;
+  envKind: EnvKind;
+  #variables: Map<string, Type> = new Map();
+  #rootIndices: number[] = [];
+  #freshRootId = 0;
 
-  constructor(parent?: VarEnv) {
+  constructor(envKind: EnvKind, parent?: VarEnv) {
     this.envId = freshEnvId++;
     this.parent_ = parent;
-    this.#variables = new Map();
+    this.envKind = envKind;
+  }
+
+  private incrementTmpId(): number {
+    switch (this.envKind) {
+      case "proc":
+        return this.#freshRootId++;
+      case "module":
+        throw new Error("module level environment doesn't have root table");
+      case "let":
+        return this.parent_!.incrementTmpId();
+    }
+  }
+
+  freshRootId(): number {
+    const freshId = this.incrementTmpId();
+    this.#rootIndices.push(freshId);
+    return freshId;
+  }
+
+  get rootIndices(): number[] {
+    return this.#rootIndices.sort((a, b) => b - a);
+  }
+
+  get rootTableSize(): number {
+    return this.#freshRootId;
   }
 
   getVarTyAndLevel(name: string): { ty: Type, level: number, envId: number } | undefined {

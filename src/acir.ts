@@ -16,6 +16,7 @@ export type ACProcDefInst = {
 };
 
 export type ACProcBodyInst =
+  ACRootTableInitInst | ACRootTableRegInst | ACRootTableUnregInst |
   ACProcFrameInitInst | ACProcFrameDefTmp | ACProcFrameDefTmpNoVal | ACProcFrameStoreTmp |
   ACProcReturnInst |
   ACEnvDefVarInst |
@@ -28,11 +29,16 @@ export type ACEnvLoadInst = { inst: "env.load", envId: number, varName: string }
 export type ACModDefsLoadInst = { inst: "mod_defs.load", varName: string };
 export type ACBuiltinLoadInst = { inst: "builtin.load", varName: string };
 
-export type ACProcFrameInitInst = { inst: "proc_frame.init" }
+export type ACRootTableInitInst = { inst: "root_table.init", size: number };
+export type ACRootTableRegInst = { inst: "root_table.reg", envId: number, rootTableIdx: number, tmpVarIdx: number };
+export type ACRootTableUnregInst = { inst: "root_table.unreg", idx: number };
+
+export type ACProcFrameInitInst = { inst: "proc_frame.init", rootTableSize: number };
 export type ACProcFrameDefTmp = { inst: "proc_frame.deftmp", envId: number, idx: number, ty: Type, value: ACPushValInst };
 export type ACProcFrameDefTmpNoVal = { inst: "proc_frame.deftmp_noval", envId: number, idx: number, ty: Type };
 export type ACProcFrameLoadTmp = { inst: "proc_frame.load_tmp", envId: number, idx: number };
 export type ACProcFrameStoreTmp = { inst: "proc_frame.store_tmp", envId: number, idx: number, value: ACPushValInst };
+
 export type ACProcReturnInst = { inst: "proc.return", value: ACPushValInst };
 
 export type ACIfElseInst = { inst: "ifelse", cond: ACPushValInst, then: ACProcBodyInst[], else: ACProcBodyInst[] };

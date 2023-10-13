@@ -54,6 +54,9 @@ if (import.meta.main) {
     if (outputFileName) {
       ccArgs = ["-o", outputFileName].concat(ccArgs);
     }
+    if (otherOptions["mem_manager_dbg_output"]) {
+      ccArgs.push("-DAJISAI_MEMORY_MANAGER_DEBUG_OUTPUT");
+    }
 
     const command = new Deno.Command("cc", {
       args: ccArgs,

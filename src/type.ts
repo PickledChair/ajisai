@@ -43,3 +43,18 @@ export const toCType = (ty: Type): string => {
   }
   throw new Error("invalid type");
 };
+
+export const mayBeHeapObj = (ty: Type): boolean => {
+  if (ty.tyKind === "primitive") {
+    switch (ty.name) {
+      case "i32":
+      case "bool":
+      case "()":
+        return false;
+      case "str":
+        return true;
+    }
+  }
+  // proc 等
+  return true;
+};
