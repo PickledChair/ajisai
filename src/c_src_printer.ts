@@ -1,6 +1,6 @@
 import { ACEntryInst, ACIfElseInst, ACModuleInst, ACProcBodyInst, ACProcDeclInst, ACProcDefInst, ACPushValInst } from "./acir.ts";
 import { toCType } from "./type.ts";
-import { writeAll } from "https://deno.land/std@0.201.0/streams/write_all.ts";
+import { writeAll } from "https://deno.land/std@0.204.0/streams/write_all.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
 
