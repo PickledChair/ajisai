@@ -1,4 +1,4 @@
-import { assertEquals } from "https://deno.land/std@0.201.0/assert/mod.ts";
+import { assertEquals } from "./deps.ts";
 import { Lexer } from "../src/lexer.ts";
 import { Parser } from "../src/parser.ts";
 

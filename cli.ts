@@ -1,4 +1,4 @@
-import { parse } from "https://deno.land/std@0.201.0/flags/mod.ts";
+import { parse } from "https://deno.land/std@0.204.0/flags/mod.ts";
 import { CodeGenerator, Lexer, Parser, SemanticAnalyzer, printCSrc } from "./mod.ts";
 
 if (import.meta.main) {
