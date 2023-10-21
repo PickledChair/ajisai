@@ -73,10 +73,10 @@ typedef enum {
 } AjisaiObjTag;
 
 enum {
-  AJISAI_HEAP_OBJ  = 0x80000000,
-  AJISAI_BLACK_OBJ = 0x40000000,
-  AJISAI_GRAY_OBJ  = 0x20000000,
-  AJISAI_OBJ_MASK  = 0x0000ffff,
+  AJISAI_HEAP_OBJ      = 0x80000000,
+  AJISAI_BLACK_OBJ     = 0x40000000,
+  AJISAI_GRAY_OBJ      = 0x20000000,
+  AJISAI_OBJ_TAG_MASK  = 0x0000ffff,
 };
 
 typedef struct AjisaiObject AjisaiObject;
@@ -86,12 +86,12 @@ typedef struct {
 } AjisaiTypeInfo;
 
 struct AjisaiObject {
-  // 上位16bitをAjisaiObjTagの値として使う。下位16bitはメタデータのための領域とする
-  AjisaiObjTag tag;
+  // 下位16bitをAjisaiObjTagの値として使う。上位16bitはメタデータのための領域とする
+  uint32_t tag;
   AjisaiTypeInfo *type_info;
 };
 
-#define AJISAI_OBJ_TAG(obj) ((obj)->tag & AJISAI_OBJ_MASK)
+#define AJISAI_OBJ_TAG(obj) ((obj)->tag & AJISAI_OBJ_TAG_MASK)
 #define AJISAI_IS_HEAP_OBJ(obj) ((obj)->tag & AJISAI_HEAP_OBJ)
 #define AJISAI_IS_GRAY_OBJ(obj) ((obj)->tag & AJISAI_GRAY_OBJ)
 #define AJISAI_IS_ALIVE_OBJ(obj, manager) ((manager)->live_color == AJISAI_BLACK ? ((obj)->tag & AJISAI_BLACK_OBJ) : !((obj)->tag & AJISAI_BLACK_OBJ))

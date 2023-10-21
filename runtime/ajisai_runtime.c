@@ -308,11 +308,11 @@ static void ajisai_mem_manager_release_from_space(AjisaiMemManager *manager) {
   int released_cell_count = 0;
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 
-  while (manager->top != manager->free.bottom && manager->top->prev != manager->free.bottom) {
-    AjisaiMemCell *released = manager->top->prev;
+  while (manager->top != manager->free.bottom) {
+    AjisaiMemCell *released = manager->top;
+    manager->top = manager->top->prev;
 
-    manager->top->prev = released->prev;
-    released->prev->next = manager->top;
+    AJISAI_MEMCELL_POP_OWN(manager, released);
 
     AjisaiObject *obj = (AjisaiObject *)released->data->data;
     ajisai_object_heap_free(obj);
@@ -364,6 +364,7 @@ static void ajisai_proc_frame_scan_roots(ProcFrame *proc_frame) {
 
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] scan_roots end (%d cells going to to-space)\n", scanned_cell_count);
+  ajisai_mem_manager_display_stat(manager);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 }
 
