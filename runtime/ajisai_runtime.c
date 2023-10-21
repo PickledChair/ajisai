@@ -124,6 +124,7 @@ int ajisai_mem_manager_init(AjisaiMemManager *manager) {
   manager->top = manager->scan = manager->free.bottom;
 
   manager->gc_in_progress = false;
+  manager->live_color = AJISAI_WHITE;
 
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   ajisai_mem_manager_display_stat(manager);
@@ -135,9 +136,10 @@ int ajisai_mem_manager_init(AjisaiMemManager *manager) {
 void ajisai_str_heap_free(AjisaiObject *obj);
 
 static void ajisai_object_heap_free(AjisaiObject *obj) {
-  switch (obj->tag) {
-    case AJISAI_OBJ_STR_HEAP:
-      ajisai_str_heap_free(obj);
+  switch (AJISAI_OBJ_TAG(obj)) {
+    case AJISAI_OBJ_STR:
+      if (AJISAI_IS_HEAP_OBJ(obj))
+        ajisai_str_heap_free(obj);
       break;
     default:
       break;
@@ -258,6 +260,13 @@ void ajisai_mem_manager_append_to_to_space(AjisaiMemManager *manager, AjisaiMemC
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 }
 
+static void ajisai_object_mark_alive(AjisaiObject *obj, AjisaiMemManager *mem_manager) {
+  if (mem_manager->live_color == AJISAI_WHITE)
+    obj->tag &= ~AJISAI_BLACK_OBJ;
+  else
+    obj->tag |= AJISAI_BLACK_OBJ;
+}
+
 // NOTE: scan が終了状態の時は何も行わず 1 を返す
 static int ajisai_mem_manager_scan_obj_tree(AjisaiMemManager *manager) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -273,7 +282,16 @@ static int ajisai_mem_manager_scan_obj_tree(AjisaiMemManager *manager) {
   }
 
   AjisaiObject *obj = (AjisaiObject *)manager->scan->data->data;
-  obj->type_info->scan_func(manager, obj);
+
+  // GRAYビットが立っているオブジェクトがスキャン対象
+  if (AJISAI_IS_GRAY_OBJ(obj)) {
+    // スキャンを実行
+    obj->type_info->scan_func(manager, obj);
+    // スキャン済みのマークをする
+    obj->tag &= ~AJISAI_GRAY_OBJ;
+    ajisai_object_mark_alive(obj, manager);
+  }
+  // スキャンポインタを次に進める
   manager->scan = manager->scan->prev;
 
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -315,8 +333,6 @@ static void ajisai_mem_manager_release_from_space(AjisaiMemManager *manager) {
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 }
 
-#define AJISAI_OBJ_IS_STATIC(obj) ((obj)->tag == AJISAI_OBJ_STR_STATIC)
-
 static void ajisai_proc_frame_scan_roots(ProcFrame *proc_frame) {
   AjisaiMemManager *manager = proc_frame->mem_manager;
 
@@ -332,9 +348,11 @@ static void ajisai_proc_frame_scan_roots(ProcFrame *proc_frame) {
 
     for (size_t i = 0; i < frame->root_table_size; i++) {
       AjisaiObject *obj = frame->root_table[i];
-      if (obj != NULL && !AJISAI_OBJ_IS_STATIC(obj)) {
+      if (obj != NULL && AJISAI_IS_HEAP_OBJ(obj) && !AJISAI_IS_GRAY_OBJ(obj)) {
         AjisaiMemCell *cell = AJISAI_OBJ_GET_OWNER_CELL(obj);
         AJISAI_MEMCELL_POP_OWN(manager, cell);
+        // スキャン中のフラグ (AJISAI_GRAY_OBJ) を立てる
+        obj->tag |= AJISAI_GRAY_OBJ;
         ajisai_mem_manager_append_to_to_space(manager, cell);
 
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
@@ -359,8 +377,15 @@ AjisaiObject *ajisai_object_alloc(ProcFrame *proc_frame, size_t size) {
     if (cell == NULL)
       return NULL;
 
-    if (allocate_block) {
+    if (allocate_block && !mem_manager->gc_in_progress) {
       mem_manager->gc_in_progress = true;
+
+      // 生きているオブジェクトの色を反転させることで、全てのオブジェクトの生存フラグを外す
+      if (mem_manager->live_color == AJISAI_WHITE)
+        mem_manager->live_color = AJISAI_BLACK;
+      else
+        mem_manager->live_color = AJISAI_WHITE;
+
       ajisai_proc_frame_scan_roots(proc_frame);
     }
 
@@ -439,10 +464,14 @@ void ajisai_flush(void) {
 
 static void ajisai_str_scan_func(AjisaiMemManager *mem_manager, AjisaiObject *obj) {
   AjisaiString *str = (AjisaiString *)obj;
-  if (str->obj_header.tag == AJISAI_OBJ_STR_SLICE) {
+  if (AJISAI_OBJ_TAG(&str->obj_header) == AJISAI_OBJ_STR_SLICE) {
     AjisaiMemCell *cell = AJISAI_OBJ_GET_OWNER_CELL((AjisaiObject *)str->src);
-    AJISAI_MEMCELL_POP_OWN(mem_manager, cell);
-    ajisai_mem_manager_append_to_to_space(mem_manager, cell);
+    if (!AJISAI_IS_GRAY_OBJ((AjisaiObject *)str->src) && !AJISAI_IS_ALIVE_OBJ((AjisaiObject *)str->src, mem_manager)) {
+      AJISAI_MEMCELL_POP_OWN(mem_manager, cell);
+      // 今後のスキャン対象としてマーク
+      ((AjisaiObject *)str->src)->tag |= AJISAI_GRAY_OBJ;
+      ajisai_mem_manager_append_to_to_space(mem_manager, cell);
+    }
   }
 }
 
@@ -457,7 +486,7 @@ AjisaiTypeInfo *ajisai_str_type_info(void) {
 
 static AjisaiString *ajisai_empty_str(void) {
   static AjisaiString ajisai_empty_str_ =
-    { .obj_header = { .tag = AJISAI_OBJ_STR_STATIC }, .len = 0, .value = "" };
+    { .obj_header = { .tag = AJISAI_OBJ_STR }, .len = 0, .value = "" };
   if (ajisai_empty_str_.obj_header.type_info != NULL)
     return &ajisai_empty_str_;
 
@@ -471,7 +500,7 @@ static AjisaiString *ajisai_str_new(
     return ajisai_empty_str();
 
   AjisaiString *new_str = (AjisaiString *)ajisai_object_alloc(proc_frame, sizeof(AjisaiString));
-  new_str->obj_header.tag = tag;
+  new_str->obj_header.tag = tag | AJISAI_HEAP_OBJ;
   new_str->obj_header.type_info = ajisai_str_type_info();
   new_str->len = len;
   new_str->value = str_data;
@@ -503,7 +532,7 @@ AjisaiString *ajisai_str_concat(ProcFrame *proc_frame, AjisaiString *a, AjisaiSt
   memcpy(new_str_data + a_str_len, b->value, b_str_len);
   new_str_data[new_str_len] = '\0';
 
-  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_HEAP, new_str_len, new_str_data, NULL);
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR, new_str_len, new_str_data, NULL);
 }
 
 AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t start, int32_t end) {
@@ -542,5 +571,5 @@ AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_
     memcpy(new_str_data + src->len * i, src->value, src->len);
   new_str_data[new_str_len] = '\0';
 
-  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_HEAP, new_str_len, new_str_data, NULL);
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR, new_str_len, new_str_data, NULL);
 }
