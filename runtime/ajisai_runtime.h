@@ -19,15 +19,15 @@ struct AjisaiMemCell {
 };
 
 #define AJISAI_MEMCELL_POP_OWN(manager, cell) do { \
-    (cell)->next->prev = (cell)->prev; \
-    (cell)->prev->next = (cell)->next; \
-    if ((cell) == (manager)->top) { \
-      (manager)->top = (cell)->prev; \
-    } \
-    if ((cell) == (manager)->scan) { \
-      (manager)->scan = (cell)->prev; \
-    } \
-    (cell)->next = (cell)->prev = NULL; \
+    (cell)->next->prev = (cell)->prev;             \
+    (cell)->prev->next = (cell)->next;             \
+    if ((cell) == (manager)->top) {                \
+      (manager)->top = (cell)->prev;               \
+    }                                              \
+    if ((cell) == (manager)->scan) {               \
+      (manager)->scan = (cell)->prev;              \
+    }                                              \
+    (cell)->next = (cell)->prev = NULL;            \
   } while (0)
 
 typedef struct AjisaiMemCellBlock AjisaiMemCellBlock;
@@ -50,11 +50,17 @@ typedef struct {
   AjisaiMemCell new_edge, *bottom;
 } AjisaiFreeMemCells;
 
+typedef enum {
+  AJISAI_WHITE,
+  AJISAI_BLACK,
+} AjisaiObjColor;
+
 typedef struct {
   AjisaiMemCellAllocator memcell_allocator;
   AjisaiMemCell *top, *scan;
   AjisaiFreeMemCells free;
   bool gc_in_progress;
+  AjisaiObjColor live_color;
 } AjisaiMemManager;
 
 int ajisai_mem_manager_init(AjisaiMemManager *manager);
@@ -62,10 +68,16 @@ void ajisai_mem_manager_deinit(AjisaiMemManager *manager);
 void ajisai_mem_manager_append_to_to_space(AjisaiMemManager *manager, AjisaiMemCell *cell);
 
 typedef enum {
-  AJISAI_OBJ_STR_STATIC,
-  AJISAI_OBJ_STR_HEAP,
+  AJISAI_OBJ_STR,
   AJISAI_OBJ_STR_SLICE,
 } AjisaiObjTag;
+
+enum {
+  AJISAI_HEAP_OBJ  = 0x80000000,
+  AJISAI_BLACK_OBJ = 0x40000000,
+  AJISAI_GRAY_OBJ  = 0x20000000,
+  AJISAI_OBJ_MASK  = 0x0000ffff,
+};
 
 typedef struct AjisaiObject AjisaiObject;
 
@@ -74,10 +86,15 @@ typedef struct {
 } AjisaiTypeInfo;
 
 struct AjisaiObject {
+  // 上位16bitをAjisaiObjTagの値として使う。下位16bitはメタデータのための領域とする
   AjisaiObjTag tag;
   AjisaiTypeInfo *type_info;
 };
 
+#define AJISAI_OBJ_TAG(obj) ((obj)->tag & AJISAI_OBJ_MASK)
+#define AJISAI_IS_HEAP_OBJ(obj) ((obj)->tag & AJISAI_HEAP_OBJ)
+#define AJISAI_IS_GRAY_OBJ(obj) ((obj)->tag & AJISAI_GRAY_OBJ)
+#define AJISAI_IS_ALIVE_OBJ(obj, manager) ((manager)->live_color == AJISAI_BLACK ? ((obj)->tag & AJISAI_BLACK_OBJ) : !((obj)->tag & AJISAI_BLACK_OBJ))
 #define AJISAI_OBJ_GET_OWNER_CELL(obj) ((AjisaiByteData *)((uint8_t *)(obj) - sizeof(AjisaiByteData)))->owner_cell
 
 typedef struct AjisaiString AjisaiString;
