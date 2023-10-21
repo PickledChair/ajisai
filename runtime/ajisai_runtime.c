@@ -424,8 +424,10 @@ AjisaiObject *ajisai_object_alloc(ProcFrame *proc_frame, size_t size) {
 void ajisai_gc_start(ProcFrame *proc_frame) {
   AjisaiMemManager *mem_manager = proc_frame->mem_manager;
 
-  mem_manager->gc_in_progress = true;
-  ajisai_proc_frame_scan_roots(proc_frame);
+  if (!mem_manager->gc_in_progress) {
+    mem_manager->gc_in_progress = true;
+    ajisai_proc_frame_scan_roots(proc_frame);
+  }
   while (ajisai_mem_manager_scan_obj_tree(mem_manager) == 0);
   ajisai_mem_manager_release_from_space(mem_manager);
   mem_manager->top = mem_manager->scan = mem_manager->free.new_edge.prev;
