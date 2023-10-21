@@ -1,6 +1,5 @@
 import { ACEntryInst, ACIfElseInst, ACModuleInst, ACProcBodyInst, ACProcDeclInst, ACProcDefInst, ACPushValInst } from "./acir.ts";
 import { toCType } from "./type.ts";
-import { writeAll } from "https://deno.land/std@0.204.0/streams/write_all.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
 
@@ -12,73 +11,74 @@ const cMain = `int main(void) {
 
 export const printCSrc = async (filePath: string, module: ACModuleInst) => {
   const file = await Deno.open(filePath, { write: true, create: true, truncate: true });
+  const writer = file.writable.getWriter();
 
   try {
     const encoder = new TextEncoder();
 
-    await writeAll(file, encoder.encode(defaultFileHeader));
+    await writer.write(encoder.encode(defaultFileHeader));
 
     for (const procDecl of module.procDecls) {
-      await printProtoType(file, encoder, procDecl);
+      await printProtoType(writer, encoder, procDecl);
     }
 
     for (const procDef of module.procDefs) {
-      await writeAll(file, encoder.encode("\n"));
-      await printProcDef(file, encoder, procDef);
+      await writer.write(encoder.encode("\n"));
+      await printProcDef(writer, encoder, procDef);
     }
 
     if (module.entry) {
-      await writeAll(file, encoder.encode("\n"));
-      await printEntry(file, encoder, module.entry);
+      await writer.write(encoder.encode("\n"));
+      await printEntry(writer, encoder, module.entry);
 
-      await writeAll(file, encoder.encode("\n"));
-      await writeAll(file, encoder.encode(cMain));
+      await writer.write(encoder.encode("\n"));
+      await writer.write(encoder.encode(cMain));
     }
   } finally {
     file.close();
   }
 };
 
-const printProtoType = async (file: Deno.FsFile, encoder: TextEncoder, procDecl: ACProcDeclInst) => {
+const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, procDecl: ACProcDeclInst) => {
   let line = `${toCType(procDecl.resultType)} userdef_${procDecl.procName}(ProcFrame *parent_frame`;
   for (const [argName, argTy] of procDecl.args) {
     line += `, ${toCType(argTy)} ${argName}`;
   }
   line += ");\n";
-  await writeAll(file, encoder.encode(line));
+  await writer.write(encoder.encode(line));
 };
 
-const printEntry = async (file: Deno.FsFile, encoder: TextEncoder, entry: ACEntryInst) => {
-  await writeAll(file, encoder.encode("void ajisai_main(void) {\n"));
-  await writeAll(file, encoder.encode("  AjisaiMemManager mem_manager;\n"));
+const printEntry = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, entry: ACEntryInst) => {
+  await writer.write(encoder.encode("void ajisai_main(void) {\n"));
+  await writer.write(encoder.encode("  AjisaiMemManager mem_manager;\n"));
   // TODO: メモリ確保に失敗した時に終了する処理を入れる
-  await writeAll(file, encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
-  await writeAll(file, encoder.encode("  ProcFrame *parent_frame = &(ProcFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
+  await writer.write(encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
+  await writer.write(encoder.encode("  ProcFrame *parent_frame = &(ProcFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
 
   for (const inst of entry.body) {
-    await printProcBodyInst(file, encoder, inst);
+    await printProcBodyInst(writer, encoder, inst);
   }
 
-  await writeAll(file, encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
-  await writeAll(file, encoder.encode("}\n"));
+  await writer.write(encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
+  await writer.write(encoder.encode("}\n"));
 };
 
-const printProcDef = async (file: Deno.FsFile, encoder: TextEncoder, procDef: ACProcDefInst) => {
+const printProcDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, procDef: ACProcDefInst) => {
   let headLine = `${toCType(procDef.resultType)} userdef_${procDef.procName}(ProcFrame *parent_frame`;
   for (const [argName, argTy] of procDef.args) {
     headLine += `, ${toCType(argTy)} env${procDef.envId}_var_${argName}`;
   }
   headLine += ") {\n";
-  await writeAll(file, encoder.encode(headLine));
+  await writer.write(encoder.encode(headLine));
 
   for (const inst of procDef.body) {
-    await printProcBodyInst(file, encoder, inst);
+    await printProcBodyInst(writer, encoder, inst);
   }
 
-  await writeAll(file, encoder.encode("}\n"));
+  await writer.write(encoder.encode("}\n"));
 };
 
-const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: ACProcBodyInst) => {
+const printProcBodyInst = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, inst: ACProcBodyInst) => {
   let line = "";
 
   switch (inst.inst) {
@@ -114,7 +114,7 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
       line = `  env${inst.envId}_tmp${inst.idx} = ${makePushValLiteral(inst.value)};\n`;
       break;
     case "ifelse":
-      await printIfElse(file, encoder, inst);
+      await printIfElse(writer, encoder, inst);
       return;
     case "builtin.call":
     case "builtin.call_with_frame":
@@ -129,7 +129,7 @@ const printProcBodyInst = async (file: Deno.FsFile, encoder: TextEncoder, inst: 
       break;
   }
 
-  await writeAll(file, encoder.encode(line));
+  await writer.write(encoder.encode(line));
 };
 
 const makePushValLiteral = (inst: ACPushValInst): string => {
@@ -193,18 +193,18 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
   }
 };
 
-const printIfElse = async (file: Deno.FsFile, encoder: TextEncoder, inst: ACIfElseInst) => {
-  await writeAll(file, encoder.encode(`  if (${makePushValLiteral(inst.cond)}) {\n`));
+const printIfElse = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, inst: ACIfElseInst) => {
+  await writer.write(encoder.encode(`  if (${makePushValLiteral(inst.cond)}) {\n`));
 
   for (const thenInst of inst.then) {
-    await printProcBodyInst(file, encoder, thenInst);
+    await printProcBodyInst(writer, encoder, thenInst);
   }
 
-  await writeAll(file, encoder.encode("  } else {\n"));
+  await writer.write(encoder.encode("  } else {\n"));
 
   for (const elseInst of inst.else) {
-    await printProcBodyInst(file, encoder, elseInst);
+    await printProcBodyInst(writer, encoder, elseInst);
   }
 
-  await writeAll(file, encoder.encode("  }\n"));
+  await writer.write(encoder.encode("  }\n"));
 };
