@@ -180,6 +180,9 @@ export class SemanticAnalyzer {
       astTy = ty;
     } else if (ast.nodeType === "let") {
       const [node, ty] = this.analyzeLet(ast, new VarEnv("let", varEnv));
+      if (mayBeHeapObj(ty)) {
+        node.rootIdx = varEnv.freshRootId();
+      }
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "if") {
@@ -319,7 +322,7 @@ export class SemanticAnalyzer {
 
     const [bodyAst, bodyTy] = this.analyzeExprSeq(ast.body, varEnv);
 
-    return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId }, bodyTy];
+    return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId, rootIndices: varEnv.rootIndices }, bodyTy];
   }
 
   private analyzeDeclare(ast: AstDeclareNode, varEnv: VarEnv): AstDeclareNode {

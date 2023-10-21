@@ -1,4 +1,13 @@
-import { ACEntryInst, ACModuleInst, ACProcBodyInst, ACProcDeclInst, ACProcDefInst, ACPushValInst } from "./acir.ts";
+import {
+  ACEntryInst,
+  ACModuleInst,
+  ACProcBodyInst,
+  ACProcDeclInst,
+  ACProcDefInst,
+  ACProcFrameDefTmpNoValInst,
+  ACPushValInst
+} from "./acir.ts";
+
 import {
   AstBinaryNode,
   AstCallNode,
@@ -11,6 +20,7 @@ import {
   AstUnaryNode,
   AstVariableNode
 } from "./ast.ts";
+
 import { DefTypeMap } from "./semant.ts";
 import { PrimitiveType, ProcType, Type, mayBeHeapObj, tyEqual } from "./type.ts";
 
@@ -354,6 +364,12 @@ class ProcCodeGenerator {
 
     this.#procCtx.enterScope(ast.envId);
 
+    let returnVar: ACProcFrameDefTmpNoValInst | undefined;
+    if (mayBeHeapObj(ast.bodyTy!)) {
+      returnVar = { inst: "proc_frame.deftmp_noval", envId: this.#procCtx.procEnvId, idx: this.#procCtx.freshProcTmpId, ty: ast.bodyTy! };
+      prelude.push(returnVar);
+    }
+
     for (const { name, value } of ast.declares) {
       const { prelude: valPrelude, valInst } = this.codegenExpr(value, defTypeMap);
       if (valPrelude) prelude = prelude.concat(valPrelude);
@@ -362,11 +378,37 @@ class ProcCodeGenerator {
       );
     }
 
-    const { prelude: bodyPrelude, valInst } = this.codegenExprSeq(ast.body, defTypeMap);
+    const { prelude: bodyPrelude, valInst: valInst_ } = this.codegenExprSeq(ast.body, defTypeMap);
     if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
 
+    let valInst: ACPushValInst | undefined;
+    if (tyEqual(ast.bodyTy!, { tyKind: "primitive", name: "()" }) && valInst_) {
+      prelude.push(valInst_);
+    } else {
+      valInst = valInst_;
+    }
+
+    if (ast.rootIndices!.length !== 0) {
+      for (const idx of ast.rootIndices!) {
+        const unregInst: ACProcBodyInst = { inst: "root_table.unreg", idx };
+        prelude.push(unregInst);
+      }
+    }
+
     this.#procCtx.leaveScope();
-    return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
+
+    if (returnVar) {
+      prelude.push({
+        inst: "proc_frame.store_tmp", envId: returnVar.envId, idx: returnVar.idx, value: valInst!
+      });
+
+      const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: returnVar.envId, rootTableIdx: ast.rootIdx!, tmpVarIdx: returnVar.idx };
+      prelude.push(rootRegInst);
+
+      return { prelude, valInst: { inst: "proc_frame.load_tmp", envId: returnVar.envId, idx: returnVar.idx } };
+    } else {
+      return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
+    }
   }
 
   private codegenIf(ast: AstIfNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
