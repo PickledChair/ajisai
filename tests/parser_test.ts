@@ -377,3 +377,56 @@ Deno.test("parsing proc definition (with expression sequence) test", () => {
     }
   );
 });
+
+Deno.test("parsing proc expression test", () => {
+  const lexer = new Lexer("let add = |a: i32, b: i32| -> i32 { a + b } { add(1, 2) }");
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "let",
+      declares: [
+        {
+          nodeType: "declare",
+          name: "add",
+          value: {
+            nodeType: "proc",
+            args: [
+              { nodeType: "procArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
+              { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
+            ],
+            body: {
+              nodeType: "exprSeq",
+              exprs: [
+                {
+                  nodeType: "binary",
+                  operator: "+",
+                  left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+                  right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                }
+              ]
+            },
+            envId: -1,
+            bodyTy: { tyKind: "primitive", name: "i32" }
+          }
+        },
+      ],
+      body: {
+        nodeType: "exprSeq",
+        exprs: [
+          {
+            nodeType: "call",
+            callee: { nodeType: "variable", name: "add", level: -1, fromEnv: -1, toEnv: -1 },
+            args: [
+              { nodeType: "integer", value: 1 },
+              { nodeType: "integer", value: 2 }
+            ]
+          }
+        ]
+      },
+      envId: -1
+    }
+  );
+});

@@ -1,6 +1,6 @@
 import { Token, TokenType } from "./token.ts";
 import { Lexer } from "./lexer.ts";
-import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstExprSeqNode, AstIfNode, AstLetNode, AstModuleNode, AstProcArgNode, BinOpKind } from "./ast.ts";
+import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstExprSeqNode, AstIfNode, AstLetNode, AstModuleNode, AstProcArgNode, AstProcNode, BinOpKind } from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
@@ -82,6 +82,9 @@ export class Parser {
   }
 
   parseExpr(): AstExprNode {
+    if (this.eat("|")) {
+      return this.parseProc();
+    }
     if (this.eat("let")) {
       return this.parseLet();
     }
@@ -139,6 +142,35 @@ export class Parser {
       };
     }
     throw new Error("Could not parse declaration");
+  }
+
+  private parseProc(): AstProcNode {
+    const args = [];
+
+    if (!this.eat("|")) {
+      while (true) {
+        args.push(this.parseProcArg());
+        if (!this.eat(",")) break;
+      }
+      this.expect("|");
+    }
+
+    let bodyTy: Type;
+    if (this.eat("->")) {
+      const tyName = isPrimitiveTypeName(this.expect("identifier").value);
+      if (tyName) {
+        bodyTy = { tyKind: "primitive", name: tyName };
+      } else {
+        throw new Error("unimplemented for custom type");
+      }
+    } else {
+      bodyTy = { tyKind: "primitive", name: "()" };
+    }
+
+    this.expect("{");
+    const body = this.parseExprSeq();
+
+    return { nodeType: "proc", args, body, envId: -1, bodyTy };
   }
 
   private parseIf(): AstIfNode {
