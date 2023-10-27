@@ -122,10 +122,10 @@ const printProcBodyInst = async (writer: WritableStreamDefaultWriter, encoder: T
     case "builtin.call":
     case "builtin.call_with_frame":
     case "proc.call":
+    case "closure.call":
       line = `  ${makePushValLiteral(inst)};\n`;
       break;
     case "str.make_static":
-      // TODO: collect_root_func を設定
       line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR }, .len = ${inst.len}, .value = ${inst.value} };\n  static_str${inst.id}.obj_header.type_info = ajisai_str_type_info();\n`;
       break;
     default:
