@@ -332,25 +332,27 @@ export class SemanticAnalyzer {
       }
       return [{ nodeType: "call", callee: procAst, args, ty: procTy.bodyType, calleeTy: procTy }, procTy.bodyType];
     }
-    if (ast.callee.nodeType === "variable") {
-      const [varAst, varTy] = this.analyzeExpr(ast.callee, varEnv);
-      if (varTy.tyKind !== "proc") {
-        throw new Error("invalid callee type");
-      }
-      if (ast.args.length !== varTy.argTypes.length) {
-        throw new Error(`invalid number of args: expected ${varTy.argTypes.length}, but got ${ast.args.length}`);
-      }
-      const args = [];
-      for (let i = 0; i < varTy.argTypes.length; i++) {
-        const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);
-        if (!tyEqual(varTy.argTypes[i], argTy)) {
-          throw new Error("invalid arg type");
-        }
-        args.push(argAst);
-      }
-      return [{ nodeType: "call", callee: varAst, args, ty: varTy.bodyType, calleeTy: varTy }, varTy.bodyType];
+
+    const [varAst, varTy] = this.analyzeExpr(ast.callee, varEnv);
+
+    if (varTy.tyKind !== "proc") {
+      throw new Error("invalid callee type");
     }
-    throw new Error("invalid callee type");
+
+    if (ast.args.length !== varTy.argTypes.length) {
+      throw new Error(`invalid number of args: expected ${varTy.argTypes.length}, but got ${ast.args.length}`);
+    }
+
+    const args = [];
+    for (let i = 0; i < varTy.argTypes.length; i++) {
+      const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);
+      if (!tyEqual(varTy.argTypes[i], argTy)) {
+        throw new Error("invalid arg type");
+      }
+      args.push(argAst);
+    }
+
+    return [{ nodeType: "call", callee: varAst, args, ty: varTy.bodyType, calleeTy: varTy }, varTy.bodyType];
   }
 
   private analyzeLet(ast: AstLetNode, varEnv: VarEnv): [AstLetNode, Type] {

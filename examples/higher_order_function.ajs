@@ -1,0 +1,20 @@
+proc print_proc_result(a: i32, b: i32, p: proc(i32, i32) -> i32) {
+    println_i32(p(a, b))
+}
+
+proc get_sub_proc() -> proc(i32, i32) -> i32 {
+    |a: i32, b: i32| -> i32 { a - b }
+}
+
+proc main() {
+    let
+        a   = 2,
+        b   = 3,
+        add = |a: i32, b: i32| -> i32 { a + b },
+        mul = |a: i32, b: i32| -> i32 { a * b }
+    {
+        print_proc_result(a, b, add);
+        print_proc_result(a, b, mul);
+        println_i32(get_sub_proc()(a, b))
+    }
+}

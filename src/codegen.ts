@@ -286,41 +286,7 @@ class ProcCodeGenerator {
       args.push(valInst!);
     }
 
-    if (ast.callee.nodeType === "variable") {
-      const varTy = ast.calleeTy!;
-
-      if (varTy && varTy.tyKind === "proc") {
-        let valInst: ACPushValInst;
-
-        if (varTy.procKind === "builtin") {
-          valInst = { inst: "builtin.call", callee: calleeValInst!, args };
-        } else if (varTy.procKind === "builtinWithFrame") {
-          valInst = { inst: "builtin.call_with_frame", callee: calleeValInst!, args };
-        } else if (varTy.procKind === "userdef") {
-          valInst = { inst: "proc.call", callee: calleeValInst!, args };
-        } else if (varTy.procKind === "closure") {
-          valInst = { inst: "closure.call", callee: calleeValInst!, args, argTypes: varTy.argTypes, bodyType: varTy.bodyType };
-        } else {
-          throw new Error(`unimplemented for proc type '${varTy.procKind}'`);
-        }
-
-        if (mayBeHeapObj(varTy.bodyType)) {
-          const tmpId = this.#procCtx.freshProcTmpId;
-
-          const defTmpInst: ACProcBodyInst = { inst: "proc_frame.deftmp", envId: this.#procCtx.procEnvId, idx: tmpId, ty: ast.ty!, value: valInst };
-          prelude.push(defTmpInst);
-
-          const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: this.#procCtx.procEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
-          prelude.push(rootRegInst);
-
-          valInst = { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: tmpId };
-        }
-
-        return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
-      } else {
-        throw new Error(`invalid callee type: ${varTy}`);
-      }
-    } else if (ast.callee.nodeType === "proc") {
+    if (ast.callee.nodeType === "proc") {
       if (ast.ty!.tyKind !== "proc") {
         throw new Error("mismatch type: ${ast.ty}");
       }
@@ -328,8 +294,40 @@ class ProcCodeGenerator {
         prelude: prelude.length === 0 ? undefined : prelude,
         valInst: { inst: "closure.call", callee: calleeValInst!, args, argTypes: ast.ty!.argTypes, bodyType: ast.ty!.bodyType }
       };
+    }
+
+    const varTy = ast.calleeTy!;
+
+    if (varTy && varTy.tyKind === "proc") {
+      let valInst: ACPushValInst;
+
+      if (varTy.procKind === "builtin") {
+        valInst = { inst: "builtin.call", callee: calleeValInst!, args };
+      } else if (varTy.procKind === "builtinWithFrame") {
+        valInst = { inst: "builtin.call_with_frame", callee: calleeValInst!, args };
+      } else if (varTy.procKind === "userdef") {
+        valInst = { inst: "proc.call", callee: calleeValInst!, args };
+      } else if (varTy.procKind === "closure") {
+        valInst = { inst: "closure.call", callee: calleeValInst!, args, argTypes: varTy.argTypes, bodyType: varTy.bodyType };
+      } else {
+        throw new Error(`unimplemented for proc type '${varTy.procKind}'`);
+      }
+
+      if (mayBeHeapObj(varTy.bodyType)) {
+        const tmpId = this.#procCtx.freshProcTmpId;
+
+        const defTmpInst: ACProcBodyInst = { inst: "proc_frame.deftmp", envId: this.#procCtx.procEnvId, idx: tmpId, ty: ast.ty!, value: valInst };
+        prelude.push(defTmpInst);
+
+        const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: this.#procCtx.procEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
+        prelude.push(rootRegInst);
+
+        valInst = { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: tmpId };
+      }
+
+      return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
     } else {
-      throw new Error(`nodeType '${ast.nodeType} cannot be callee'`);
+      throw new Error(`invalid callee type: ${varTy}`);
     }
   }
 
