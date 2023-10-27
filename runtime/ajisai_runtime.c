@@ -134,12 +134,16 @@ int ajisai_mem_manager_init(AjisaiMemManager *manager) {
 }
 
 void ajisai_str_heap_free(AjisaiObject *obj);
+void ajisai_closure_heap_free(AjisaiObject *obj);
 
 static void ajisai_object_heap_free(AjisaiObject *obj) {
   switch (AJISAI_OBJ_TAG(obj)) {
     case AJISAI_OBJ_STR:
       if (AJISAI_IS_HEAP_OBJ(obj))
         ajisai_str_heap_free(obj);
+      break;
+    case AJISAI_OBJ_PROC:
+      ajisai_closure_heap_free(obj);
       break;
     default:
       break;
@@ -575,4 +579,38 @@ AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_
   new_str_data[new_str_len] = '\0';
 
   return ajisai_str_new(proc_frame, AJISAI_OBJ_STR, new_str_len, new_str_data, NULL);
+}
+
+static void ajisai_proc_scan_func(AjisaiMemManager *mem_manager, AjisaiObject *obj) {
+  AjisaiClosure *cls = (AjisaiClosure *)obj;
+  if (cls->scan_func)
+    cls->scan_func(mem_manager, obj);
+}
+
+AjisaiTypeInfo *ajisai_proc_type_info(void) {
+  static AjisaiTypeInfo ajisai_proc_type_info_ = {};
+  if (ajisai_proc_type_info_.scan_func != NULL)
+    return &ajisai_proc_type_info_;
+
+  ajisai_proc_type_info_.scan_func = ajisai_proc_scan_func;
+  return &ajisai_proc_type_info_;
+}
+
+AjisaiClosure *ajisai_closure_new(
+    ProcFrame *proc_frame, void *func_ptr, void (*scan_func)(AjisaiMemManager *, AjisaiObject *)) {
+  AjisaiClosure *new_closure = (AjisaiClosure *)ajisai_object_alloc(proc_frame, sizeof(AjisaiClosure));
+  new_closure->obj_header.tag = AJISAI_OBJ_PROC | AJISAI_HEAP_OBJ;
+  new_closure->obj_header.type_info = ajisai_proc_type_info();
+  new_closure->func_ptr = func_ptr;
+  new_closure->captured_vars = NULL;
+  new_closure->scan_func = scan_func;
+  return new_closure;
+}
+
+void ajisai_closure_heap_free(AjisaiObject *obj) {
+  AjisaiClosure *cls = (AjisaiClosure *)obj;
+  if (cls->captured_vars) {
+    free(cls->captured_vars);
+    cls->captured_vars = NULL;
+  }
 }

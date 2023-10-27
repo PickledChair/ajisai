@@ -128,6 +128,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
 
 export class SemanticAnalyzer {
   #module: AstModuleNode;
+  #additional_defs: AstDefNode[] = [];
+  #clsId = 0;
   defTypeMap: DefTypeMap;
 
   constructor(module: AstModuleNode) {
@@ -136,10 +138,12 @@ export class SemanticAnalyzer {
   }
 
   analyze(): AstModuleNode {
-    return {
-      nodeType: "module",
-      defs: this.#module.defs.map(def => this.analyzeDef(def))
-    };
+    const defs = this.#module.defs.map(def => this.analyzeDef(def));
+    for (const def of this.#additional_defs) {
+      this.defTypeMap.set(def.declare.name, def.declare.ty!);
+      defs.push(def);
+    }
+    return { nodeType: "module", defs };
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
@@ -169,6 +173,9 @@ export class SemanticAnalyzer {
 
     if (ast.nodeType === "proc") {
       const [node, ty] = this.analyzeProc(ast, new VarEnv("proc", varEnv));
+      if (varEnv.envKind !== "module") {
+        node.rootIdx = varEnv.freshRootId();
+      }
       ast = node;
       astTy = ty;
     } else if (ast.nodeType === "call") {
@@ -248,6 +255,10 @@ export class SemanticAnalyzer {
     return [{ nodeType: "exprSeq", exprs, ty: exprSeqType }, exprSeqType];
   }
 
+  private freshClsId(): number {
+    return this.#clsId++;
+  }
+
   private analyzeProc(ast: AstProcNode, varEnv: VarEnv): [AstProcNode, ProcType] {
     for (const { name, ty } of ast.args) {
       if (ty) {
@@ -259,6 +270,7 @@ export class SemanticAnalyzer {
         varEnv.setVarTy(name, { tyKind: "dummy" });
       }
     }
+
     const [bodyAst, bodyType] = this.analyzeExprSeq(ast.body, varEnv);
 
     // ここではすでに引数の型が決定しているはず
@@ -273,10 +285,38 @@ export class SemanticAnalyzer {
         return resolvedTy;
       }
     });
-    return [
-      { nodeType: "proc", args: ast.args, body: bodyAst, envId: varEnv.envId, bodyTy: bodyType, rootTableSize: varEnv.rootTableSize },
-      { tyKind: "proc", procKind: "userdef", argTypes, bodyType }
-    ];
+
+    const procTy: Type = {
+      tyKind: "proc",
+      procKind: varEnv.parent_!.envKind === "module" ? "userdef" : "closure",
+      argTypes,
+      bodyType
+    };
+
+    const procAst: AstProcNode = {
+      nodeType: "proc",
+      args: ast.args,
+      body: bodyAst,
+      envId: varEnv.envId,
+      bodyTy: bodyType,
+      rootTableSize: varEnv.rootTableSize,
+      closureId: varEnv.parent_!.envKind === "module" ? undefined : this.freshClsId(),
+      ty: procTy
+    };
+
+    if (procTy.procKind === "closure") {
+      this.#additional_defs.push({
+        nodeType: "def",
+        declare: {
+          nodeType: "declare",
+          name: `${procAst.closureId!}`,
+          ty: procTy,
+          value: procAst
+        }
+      });
+    }
+
+    return [procAst, procTy];
   }
 
   private analyzeCall(ast: AstCallNode, varEnv: VarEnv): [AstCallNode, Type] {
@@ -290,11 +330,11 @@ export class SemanticAnalyzer {
         }
         args.push(argAst);
       }
-      return [{ nodeType: "call", callee: procAst, args, ty: procTy.bodyType }, procTy.bodyType];
+      return [{ nodeType: "call", callee: procAst, args, ty: procTy.bodyType, calleeTy: procTy }, procTy.bodyType];
     }
     if (ast.callee.nodeType === "variable") {
       const [varAst, varTy] = this.analyzeExpr(ast.callee, varEnv);
-      if (varTy.tyKind === "primitive" || varTy.tyKind === "dummy") {
+      if (varTy.tyKind !== "proc") {
         throw new Error("invalid callee type");
       }
       if (ast.args.length !== varTy.argTypes.length) {
@@ -308,7 +348,7 @@ export class SemanticAnalyzer {
         }
         args.push(argAst);
       }
-      return [{ nodeType: "call", callee: varAst, args, ty: varTy.bodyType }, varTy.bodyType];
+      return [{ nodeType: "call", callee: varAst, args, ty: varTy.bodyType, calleeTy: varTy }, varTy.bodyType];
     }
     throw new Error("invalid callee type");
   }

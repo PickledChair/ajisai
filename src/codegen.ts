@@ -1,9 +1,10 @@
 import {
+  ACClosureMakeInst,
   ACEntryInst,
   ACModuleInst,
   ACProcBodyInst,
-  ACProcDeclInst,
-  ACProcDefInst,
+  ACDeclInst,
+  ACDefInst,
   ACProcFrameDefTmpNoValInst,
   ACPushValInst
 } from "./acir.ts";
@@ -43,7 +44,7 @@ export class CodeGenerator {
         const procCodeGen = new ProcCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstProcNode);
         const [procDecl, procDef] = procCodeGen.codegen(this.#defTypeMap);
         if (procDecl) procDecls.push(procDecl);
-        if (procDef.inst === "proc.def") {
+        if (procDef.inst === "proc.def" || procDef.inst === "closure.def") {
           procDefs.push(procDef);
         } else if (procDef.inst === "entry") {
           entry = procDef;
@@ -95,7 +96,7 @@ class ProcContext {
 
 const getExprType = (expr: AstExprNode): Type | undefined => {
   switch (expr.nodeType) {
-    case "proc": return expr.bodyTy;
+    case "proc": return expr.ty;
     case "if": return expr.ty;
     case "let": return expr.bodyTy;
     case "exprSeq": return expr.ty;
@@ -121,7 +122,7 @@ class ProcCodeGenerator {
     this.#procCtx = new ProcContext(procName, proc.envId);
   }
 
-  codegen(defTypeMap: DefTypeMap): [ACProcDeclInst | undefined, ACProcDefInst | ACEntryInst] {
+  codegen(defTypeMap: DefTypeMap): [ACDeclInst | undefined, ACDefInst | ACEntryInst] {
     const procDeclInst = this.makeProcDeclInst();
 
     let bodyInsts: ACProcBodyInst[]  = [];
@@ -153,7 +154,7 @@ class ProcCodeGenerator {
       return [
         procDeclInst,
         {
-          inst: "proc.def",
+          inst: this.#procNode.closureId == null ? "proc.def" : "closure.def",
           procName: procDeclInst.procName,
           args: procDeclInst.args,
           resultType: procDeclInst.resultType,
@@ -164,9 +165,9 @@ class ProcCodeGenerator {
     }
   }
 
-  private makeProcDeclInst(): ACProcDeclInst {
+  private makeProcDeclInst(): ACDeclInst {
     return {
-      inst: "proc.decl",
+      inst: this.#procNode.closureId == null ? "proc.decl" : "closure.decl",
       procName: this.#procCtx.procName,
       args: this.#procNode.args.map(arg => [arg.name, arg.ty!]),
       resultType: this.#procTy.bodyType
@@ -175,6 +176,8 @@ class ProcCodeGenerator {
 
   private codegenExpr(ast: AstExprNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
     switch (ast.nodeType) {
+      case "proc":
+        return this.codegenClosure(ast);
       case "unary":
         return this.codegenUnary(ast, defTypeMap);
       case "binary":
@@ -284,7 +287,8 @@ class ProcCodeGenerator {
     }
 
     if (ast.callee.nodeType === "variable") {
-      const varTy = defTypeMap.get(ast.callee.name);
+      const varTy = ast.calleeTy!;
+
       if (varTy && varTy.tyKind === "proc") {
         let valInst: ACPushValInst;
 
@@ -294,8 +298,10 @@ class ProcCodeGenerator {
           valInst = { inst: "builtin.call_with_frame", callee: calleeValInst!, args };
         } else if (varTy.procKind === "userdef") {
           valInst = { inst: "proc.call", callee: calleeValInst!, args };
+        } else if (varTy.procKind === "closure") {
+          valInst = { inst: "closure.call", callee: calleeValInst!, args, argTypes: varTy.argTypes, bodyType: varTy.bodyType };
         } else {
-          throw new Error("unimplemented for other proc type");
+          throw new Error(`unimplemented for proc type '${varTy.procKind}'`);
         }
 
         if (mayBeHeapObj(varTy.bodyType)) {
@@ -312,10 +318,18 @@ class ProcCodeGenerator {
 
         return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
       } else {
-        throw new Error("unreachable");
+        throw new Error(`invalid callee type: ${varTy}`);
       }
+    } else if (ast.callee.nodeType === "proc") {
+      if (ast.ty!.tyKind !== "proc") {
+        throw new Error("mismatch type: ${ast.ty}");
+      }
+      return {
+        prelude: prelude.length === 0 ? undefined : prelude,
+        valInst: { inst: "closure.call", callee: calleeValInst!, args, argTypes: ast.ty!.argTypes, bodyType: ast.ty!.bodyType }
+      };
     } else {
-      throw new Error("unimplemented for calling proc literal directly");
+      throw new Error(`nodeType '${ast.nodeType} cannot be callee'`);
     }
   }
 
@@ -326,6 +340,8 @@ class ProcCodeGenerator {
         if (varTy.tyKind === "proc") {
           if (varTy.procKind === "userdef") {
             return { valInst: { inst: "mod_defs.load", varName: ast.name } };
+          } else if (varTy.procKind === "closure") {
+            return { valInst: { inst: "closure.load", id: ast.name} };
           } else if (varTy.procKind === "builtin" || varTy.procKind === "builtinWithFrame") {
             return { valInst: { inst: "builtin.load", varName: ast.name } };
           }
@@ -453,5 +469,23 @@ class ProcCodeGenerator {
       prelude,
       valInst: isUnitType ? undefined : { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId }
     }
+  }
+
+  private codegenClosure(ast: AstProcNode): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
+    if (ast.closureId == null) {
+      throw new Error("local proc definition must have closureId");
+    }
+    const closureInst: ACClosureMakeInst = { inst: "closure.make", id: ast.closureId };
+
+    const tmpId = this.#procCtx.freshProcTmpId;
+
+    const defTmpInst: ACProcBodyInst = { inst: "proc_frame.deftmp", envId: this.#procCtx.procEnvId, idx: tmpId, ty: ast.ty!, value: closureInst };
+
+    const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: this.#procCtx.procEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
+
+    return {
+      prelude: [defTmpInst, rootRegInst],
+      valInst: { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: tmpId }
+    };
   }
 }
