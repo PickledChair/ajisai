@@ -2,15 +2,26 @@ import { Type } from "./type.ts";
 
 export type ACModuleInst = {
   inst: "module",
-  procDecls: ACProcDeclInst[],
-  procDefs: ACProcDefInst[],
+  procDecls: ACDeclInst[],
+  procDefs: ACDefInst[],
   entry?: ACEntryInst
 };
 
+export type ACDeclInst = ACProcDeclInst | ACClosureDeclInst;
+export type ACDefInst = ACProcDefInst | ACClosureDefInst;
+
 export type ACEntryInst = { inst: "entry", body: ACProcBodyInst[] };
+
 export type ACProcDeclInst = { inst: "proc.decl", procName: string, args: [string, Type][], resultType: Type };
 export type ACProcDefInst = {
   inst: "proc.def", procName: string, args: [string, Type][], resultType: Type,
+  envId: number,
+  body: ACProcBodyInst[]
+};
+
+export type ACClosureDeclInst = { inst: "closure.decl", procName: string, args: [string, Type][], resultType: Type };
+export type ACClosureDefInst = {
+  inst: "closure.def", procName: string, args: [string, Type][], resultType: Type,
   envId: number,
   body: ACProcBodyInst[]
 };
@@ -28,6 +39,7 @@ export type ACEnvDefVarInst = { inst: "env.defvar", envId: number, varName: stri
 export type ACEnvLoadInst = { inst: "env.load", envId: number, varName: string };
 export type ACModDefsLoadInst = { inst: "mod_defs.load", varName: string };
 export type ACBuiltinLoadInst = { inst: "builtin.load", varName: string };
+export type ACClosureLoadInst = { inst: "closure.load", id: string }
 
 export type ACRootTableInitInst = { inst: "root_table.init", size: number };
 export type ACRootTableRegInst = { inst: "root_table.reg", envId: number, rootTableIdx: number, tmpVarIdx: number };
@@ -46,20 +58,24 @@ export type ACIfElseInst = { inst: "ifelse", cond: ACPushValInst, then: ACProcBo
 export type ACPushValInst =
   ACBuiltinLoadInst |
   ACModDefsLoadInst |
+  ACClosureLoadInst |
   ACEnvLoadInst |
   ACProcFrameLoadTmpInst |
-  ACBuiltinCallInst | ACBuiltinCallWithFrameInst | ACProcCallInst |
+  ACBuiltinCallInst | ACBuiltinCallWithFrameInst | ACProcCallInst | ACClosureCallInst |
 
   ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
 
   ACBoolConstInst | ACBoolNotInst | ACBoolEqInst | ACBoolNeInst | ACBoolAndInst | ACBoolOrInst |
 
-  ACStrConstInst;
+  ACStrConstInst |
+
+  ACClosureMakeInst;
 
 export type ACBuiltinCallInst = { inst: "builtin.call", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACBuiltinCallWithFrameInst = { inst: "builtin.call_with_frame", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
+export type ACClosureCallInst = { inst: "closure.call", callee: ACPushValInst, args: ACPushValInst[], argTypes: Type[], bodyType: Type };
 
 export type ACI32ConstInst = { inst: "i32.const", value: number };
 export type ACI32NegInst = { inst: "i32.neg", operand: ACPushValInst };
@@ -84,3 +100,5 @@ export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPush
 
 export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string, len: number };
 export type ACStrConstInst = { inst: "str.const", id: number };
+
+export type ACClosureMakeInst = { inst: "closure.make", id: number };

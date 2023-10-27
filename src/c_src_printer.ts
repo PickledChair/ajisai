@@ -1,4 +1,4 @@
-import { ACEntryInst, ACIfElseInst, ACModuleInst, ACProcBodyInst, ACProcDeclInst, ACProcDefInst, ACPushValInst } from "./acir.ts";
+import { ACEntryInst, ACIfElseInst, ACModuleInst, ACProcBodyInst, ACDeclInst, ACDefInst, ACPushValInst } from "./acir.ts";
 import { toCType } from "./type.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
@@ -39,12 +39,15 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
   }
 };
 
-const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, procDecl: ACProcDeclInst) => {
-  let line = `${toCType(procDecl.resultType)} userdef_${procDecl.procName}(ProcFrame *parent_frame`;
-  for (const [argName, argTy] of procDecl.args) {
+const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, decl: ACDeclInst) => {
+  let line = `${toCType(decl.resultType)} ${decl.inst === "proc.decl" ? "userdef" : "closure"}_${decl.procName}(ProcFrame *parent_frame`;
+
+  for (const [argName, argTy] of decl.args) {
     line += `, ${toCType(argTy)} ${argName}`;
   }
+
   line += ");\n";
+
   await writer.write(encoder.encode(line));
 };
 
@@ -63,15 +66,15 @@ const printEntry = async (writer: WritableStreamDefaultWriter, encoder: TextEnco
   await writer.write(encoder.encode("}\n"));
 };
 
-const printProcDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, procDef: ACProcDefInst) => {
-  let headLine = `${toCType(procDef.resultType)} userdef_${procDef.procName}(ProcFrame *parent_frame`;
-  for (const [argName, argTy] of procDef.args) {
-    headLine += `, ${toCType(argTy)} env${procDef.envId}_var_${argName}`;
+const printProcDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, def: ACDefInst) => {
+  let headLine = `${toCType(def.resultType)} ${def.inst === "proc.def" ? "userdef" : "closure"}_${def.procName}(ProcFrame *parent_frame`;
+  for (const [argName, argTy] of def.args) {
+    headLine += `, ${toCType(argTy)} env${def.envId}_var_${argName}`;
   }
   headLine += ") {\n";
   await writer.write(encoder.encode(headLine));
 
-  for (const inst of procDef.body) {
+  for (const inst of def.body) {
     await printProcBodyInst(writer, encoder, inst);
   }
 
@@ -138,6 +141,8 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       return `ajisai_${inst.varName}`;
     case "mod_defs.load":
       return `userdef_${inst.varName}`;
+    case "closure.load":
+      return `closure_obj_${inst.id}`;
     case "env.load":
       return `env${inst.envId}_var_${inst.varName}`;
     case "proc_frame.load_tmp":
@@ -153,6 +158,15 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       const args = inst.args.map(arg => makePushValLiteral(arg));
       return `${callee}(&proc_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
     }
+    case "closure.call": {
+      const closure = makePushValLiteral(inst.callee);
+      const args = inst.args.map(arg => makePushValLiteral(arg));
+      const argCTypes = inst.argTypes.map(ty => toCType(ty));
+      const bodyCType = toCType(inst.bodyType);
+      return `((${bodyCType} (*)(ProcFrame *${argCTypes.length === 0 ? "" : ", " + argCTypes.join(", ")}))${closure}->func_ptr)(&proc_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
+    }
+    case "closure.make":
+      return `ajisai_closure_new(&proc_frame, closure_${inst.id}, NULL)`;
     case "i32.const":
     case "bool.const":
       return `${inst.value}`;

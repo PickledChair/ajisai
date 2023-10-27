@@ -8,7 +8,7 @@ export const isPrimitiveTypeName = (s: string): PrimitiveTypeName | null => {
   return (primitiveTypeNames as Readonly<string[]>).includes(s) ? s as PrimitiveTypeName : null;
 };
 
-export type ProcKind = "userdef" | "builtin" | "builtinWithFrame";
+export type ProcKind = "userdef" | "closure" | "builtin" | "builtinWithFrame";
 export type ProcType = { tyKind: "proc", procKind: ProcKind, argTypes: Type[], bodyType: Type };
 
 export type DummyType = { tyKind: "dummy" };
@@ -39,7 +39,7 @@ export const toCType = (ty: Type): string => {
       case "()": return "void";
     }
   } else if (ty.tyKind === "proc") {
-    throw new Error("unimplemented for proc");
+    return "AjisaiClosure *";
   }
   throw new Error("invalid type");
 };

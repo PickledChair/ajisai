@@ -70,6 +70,7 @@ void ajisai_mem_manager_append_to_to_space(AjisaiMemManager *manager, AjisaiMemC
 typedef enum {
   AJISAI_OBJ_STR,
   AJISAI_OBJ_STR_SLICE,
+  AJISAI_OBJ_PROC,
 } AjisaiObjTag;
 
 enum {
@@ -105,6 +106,14 @@ struct AjisaiString {
   AjisaiString *src;
 };
 
+typedef struct AjisaiClosure AjisaiClosure;
+struct AjisaiClosure {
+  AjisaiObject obj_header;
+  void *func_ptr;
+  void *captured_vars;
+  void (*scan_func)(AjisaiMemManager *, AjisaiObject *);
+};
+
 typedef struct ProcFrame ProcFrame;
 struct ProcFrame {
   ProcFrame *parent;
@@ -131,3 +140,6 @@ AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t
 bool ajisai_str_equal(AjisaiString *left, AjisaiString *right);
 // TODO: 反復回数指定のための数値型は符号なし整数にする
 AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_t count);
+
+AjisaiTypeInfo *ajisai_proc_type_info(void);
+AjisaiClosure *ajisai_closure_new(ProcFrame *proc_frame, void *func_ptr, void (*scan_func)(AjisaiMemManager *, AjisaiObject *));
