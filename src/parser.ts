@@ -83,7 +83,10 @@ export class Parser {
 
   parseExpr(): AstExprNode {
     if (this.eat("|")) {
-      return this.parseProc();
+      return this.parseProc(false);
+    }
+    if (this.eat("||")) {
+      return this.parseProc(true);
     }
     if (this.eat("let")) {
       return this.parseLet();
@@ -144,15 +147,17 @@ export class Parser {
     throw new Error("Could not parse declaration");
   }
 
-  private parseProc(): AstProcNode {
+  private parseProc(noArgs: boolean): AstProcNode {
     const args = [];
 
-    if (!this.eat("|")) {
-      while (true) {
-        args.push(this.parseProcArg());
-        if (!this.eat(",")) break;
+    if (!noArgs) {
+      if (!this.eat("|")) {
+        while (true) {
+          args.push(this.parseProcArg());
+          if (!this.eat(",")) break;
+        }
+        this.expect("|");
       }
-      this.expect("|");
     }
 
     let bodyTy: Type;

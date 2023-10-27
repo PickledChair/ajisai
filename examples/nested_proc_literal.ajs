@@ -1,0 +1,20 @@
+proc main() {
+    let t0 = || {
+        println_str("t0 start");
+        let t1 = || {
+            println_str("t1 start");
+            let t2 = || {
+                println_str("t2 start");
+                println_str("t2 end")
+            } {
+                t2()
+            };
+            println_str("t1 end")
+        } {
+            t1()
+        };
+        println_str("t0 end")
+    } {
+        t0()
+    }
+}

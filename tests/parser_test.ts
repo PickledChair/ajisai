@@ -430,3 +430,49 @@ Deno.test("parsing proc expression test", () => {
     }
   );
 });
+
+Deno.test("parsing proc expression (without arguments) test", () => {
+  const lexer = new Lexer("let hello = || { println_str(\"Hello, world!\") } { hello() }");
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "let",
+      declares: [
+        {
+          nodeType: "declare",
+          name: "hello",
+          value: {
+            nodeType: "proc",
+            args: [],
+            body: {
+              nodeType: "exprSeq",
+              exprs: [
+                {
+                  nodeType: "call",
+                  callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+                  args: [{ nodeType: "string", value: '"Hello, world!"', len: 0 }]
+                }
+              ]
+            },
+            envId: -1,
+            bodyTy: { tyKind: "primitive", name: "()" }
+          }
+        },
+      ],
+      body: {
+        nodeType: "exprSeq",
+        exprs: [
+          {
+            nodeType: "call",
+            callee: { nodeType: "variable", name: "hello", level: -1, fromEnv: -1, toEnv: -1 },
+            args: []
+          }
+        ]
+      },
+      envId: -1
+    }
+  );
+});
