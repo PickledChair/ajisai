@@ -6,15 +6,20 @@ proc get_sub_proc() -> proc(i32, i32) -> i32 {
     |a: i32, b: i32| -> i32 { a - b }
 }
 
+proc div_proc(a: i32, b: i32) -> i32 {
+    a / b
+}
+
 proc main() {
     let
-        a   = 2,
-        b   = 3,
+        a   = 10,
+        b   = 5,
         add = |a: i32, b: i32| -> i32 { a + b },
         mul = |a: i32, b: i32| -> i32 { a * b }
     {
         print_proc_result(a, b, add);
+        print_proc_result(a, b, get_sub_proc());
         print_proc_result(a, b, mul);
-        println_i32(get_sub_proc()(a, b))
+        print_proc_result(a, b, div_proc)
     }
 }

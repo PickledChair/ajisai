@@ -119,14 +119,15 @@ const printProcBodyInst = async (writer: WritableStreamDefaultWriter, encoder: T
     case "ifelse":
       await printIfElse(writer, encoder, inst);
       return;
-    case "builtin.call":
-    case "builtin.call_with_frame":
     case "proc.call":
     case "closure.call":
       line = `  ${makePushValLiteral(inst)};\n`;
       break;
     case "str.make_static":
       line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR }, .len = ${inst.len}, .value = ${inst.value} };\n  static_str${inst.id}.obj_header.type_info = ajisai_str_type_info();\n`;
+      break;
+    case "closure.make_static":
+      line = `  static AjisaiClosure static_closure${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_PROC }, .func_ptr = ${inst.procKind === "builtin" ? "ajisai" : "userdef"}_${inst.name} };\n  static_closure${inst.id}.obj_header.type_info = ajisai_proc_type_info();\n`;
       break;
     default:
       break;
@@ -147,12 +148,6 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       return `env${inst.envId}_var_${inst.varName}`;
     case "proc_frame.load_tmp":
       return `env${inst.envId}_tmp${inst.idx}`;
-    case "builtin.call": {
-      const callee = makePushValLiteral(inst.callee);
-      const args = inst.args.map(arg => makePushValLiteral(arg));
-      return `${callee}(${args.join(", ")})`;
-    }
-    case "builtin.call_with_frame":
     case "proc.call": {
       const callee = makePushValLiteral(inst.callee);
       const args = inst.args.map(arg => makePushValLiteral(arg));
@@ -172,6 +167,8 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       return `${inst.value}`;
     case "str.const":
       return `&static_str${inst.id}`;
+    case "closure.const":
+      return `&static_closure${inst.id}`;
     case "i32.add":
       return `(${makePushValLiteral(inst.left)} + ${makePushValLiteral(inst.right)})`;
     case "i32.sub":

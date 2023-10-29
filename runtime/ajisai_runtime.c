@@ -438,34 +438,34 @@ void ajisai_gc_start(ProcFrame *proc_frame) {
   mem_manager->gc_in_progress = false;
 }
 
-void ajisai_print_i32(int32_t value) {
+void ajisai_print_i32(ProcFrame *proc_frame, int32_t value) {
   printf("%d", value);
 }
 
-void ajisai_println_i32(int32_t value) {
-  ajisai_print_i32(value);
+void ajisai_println_i32(ProcFrame *proc_frame, int32_t value) {
+  ajisai_print_i32(proc_frame, value);
   putchar('\n');
 }
 
-void ajisai_print_bool(bool value) {
+void ajisai_print_bool(ProcFrame *proc_frame, bool value) {
   printf("%s", value ? "true" : "false");
 }
 
-void ajisai_println_bool(bool value) {
-  ajisai_print_bool(value);
+void ajisai_println_bool(ProcFrame *proc_frame, bool value) {
+  ajisai_print_bool(proc_frame, value);
   putchar('\n');
 }
 
-void ajisai_print_str(AjisaiString *value) {
+void ajisai_print_str(ProcFrame *proc_frame, AjisaiString *value) {
   printf("%.*s", (int)value->len, value->value);
 }
 
-void ajisai_println_str(AjisaiString *value) {
-  ajisai_print_str(value);
+void ajisai_println_str(ProcFrame *proc_frame, AjisaiString *value) {
+  ajisai_print_str(proc_frame, value);
   putchar('\n');
 }
 
-void ajisai_flush(void) {
+void ajisai_flush(ProcFrame *proc_frame) {
   fflush(stdout);
 }
 
@@ -561,7 +561,7 @@ AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t
   return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_SLICE, end - start, src->value + start, src);
 }
 
-bool ajisai_str_equal(AjisaiString *left, AjisaiString *right) {
+bool ajisai_str_equal(ProcFrame *proc_frame, AjisaiString *left, AjisaiString *right) {
   if (left->len != right->len)
     return false;
   return memcmp(left->value, right->value, left->len) == 0;

@@ -80,7 +80,7 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     "str_concat",
     {
       tyKind: "proc",
-      procKind: "builtinWithFrame",
+      procKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
       bodyType: { tyKind: "primitive", name: "str" }
     }
@@ -89,7 +89,7 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     "str_slice",
     {
       tyKind: "proc",
-      procKind: "builtinWithFrame",
+      procKind: "builtin",
       // TODO: 範囲指定のための数値型は符号なし整数にする
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }, { tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "str" }
@@ -108,7 +108,7 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     "str_repeat",
     {
       tyKind: "proc",
-      procKind: "builtinWithFrame",
+      procKind: "builtin",
       // TODO: 反復回数指定のための数値型は符号なし整数にする
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "str" }
@@ -118,7 +118,7 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     "gc_start",
     {
       tyKind: "proc",
-      procKind: "builtinWithFrame",
+      procKind: "builtin",
       argTypes: [],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -369,10 +369,14 @@ export class SemanticAnalyzer {
 
   private analyzeDeclare(ast: AstDeclareNode, varEnv: VarEnv): AstDeclareNode {
     const { name, ty, value } = ast;
-    const [ exprAst, exprTy ] = this.analyzeExpr(value, varEnv);
+    const [ exprAst, exprTy_ ] = this.analyzeExpr(value, varEnv);
 
     // TODO: integerリテラルをi32と対応させているが、今後u32等の他の型も登場させると対応関係が崩れる
     //       リテラルと型の対応が一対一でなくなった時に実装を変える必要がある
+    let exprTy = exprTy_;
+    if (exprTy.tyKind === "proc" && exprTy.procKind !== "closure") {
+      exprTy = { ...exprTy_, ...{ procKind: "closure" } };
+    }
     if (ty) {
       if (!tyEqual(ty, exprTy)) {
         throw new Error("mismatch type in declaration");
