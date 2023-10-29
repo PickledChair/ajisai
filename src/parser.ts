@@ -36,16 +36,9 @@ export class Parser {
     }
     const argTypes = args.map(arg => arg.ty!);
 
-    let bodyType: Type;
+    let bodyType: Type = { tyKind: "primitive", name: "()" };
     if (this.eat("->")) {
-      const tyName = isPrimitiveTypeName(this.expect("identifier").value);
-      if (tyName) {
-        bodyType = { tyKind: "primitive", name: tyName };
-      } else {
-        throw new Error("unimplemented for custom type");
-      }
-    } else {
-      bodyType = { tyKind: "primitive", name: "()" };
+      bodyType = this.parseType();
     }
 
     this.expect("{");
@@ -60,24 +53,47 @@ export class Parser {
     return { nodeType: "def", declare };
   }
 
-  private parseProcArg(): AstProcArgNode {
-    const name = this.expect("identifier");
-    this.expect(":");
-    let ty: Type;
+  private parseType(): Type {
     if (this.eat("(")) {
       // TODO: 現在はunit型だけ考慮すれば良いが、いずれタプルに対応する
       this.expect(")");
-      ty = { tyKind: "primitive", name: "()" };
+      return { tyKind: "primitive", name: "()" };
     } else {
+      if (this.eat("proc")) {
+        this.expect("(");
+
+        const argTypes: Type[] = [];
+        while (!this.eat(")")) {
+          argTypes.push(this.parseType());
+          if (!this.eat(",")) {
+            this.expect(")");
+            break;
+          }
+        }
+
+        let bodyType: Type = { tyKind: "primitive", name: "()" };
+        if (this.eat("->")) {
+          bodyType = this.parseType();
+        }
+
+        return { tyKind: "proc", procKind: "closure", argTypes, bodyType };
+      }
+
       const tyName = this.expect("identifier").value;
       const builtinName = isPrimitiveTypeName(tyName);
       if (builtinName) {
-        ty = { tyKind: "primitive", name: builtinName };
+        return { tyKind: "primitive", name: builtinName };
       } else {
         // TODO: collection type やユーザー定義型に対応
         throw new Error("unimplemented for collection type and user definition type signature");
       }
     }
+  }
+
+  private parseProcArg(): AstProcArgNode {
+    const name = this.expect("identifier");
+    this.expect(":");
+    const ty = this.parseType();
     return { nodeType: "procArg", name: name.value, ty };
   }
 
@@ -160,16 +176,9 @@ export class Parser {
       }
     }
 
-    let bodyTy: Type;
+    let bodyTy: Type = { tyKind: "primitive", name: "()" };
     if (this.eat("->")) {
-      const tyName = isPrimitiveTypeName(this.expect("identifier").value);
-      if (tyName) {
-        bodyTy = { tyKind: "primitive", name: tyName };
-      } else {
-        throw new Error("unimplemented for custom type");
-      }
-    } else {
-      bodyTy = { tyKind: "primitive", name: "()" };
+      bodyTy = this.parseType();
     }
 
     this.expect("{");
@@ -395,10 +404,14 @@ export class Parser {
 
   private parsePostfix(pre: AstExprNode): AstExprNode {
     let expr = pre;
-    if (this.eat("(")) {
-      expr = this.parseCall(pre);
+    while (true) {
+      if (this.eat("(")) {
+        expr = this.parseCall(expr);
+        continue;
+      }
+
+      return expr;
     }
-    return expr;
   }
 
   private parseCall(callee: AstExprNode): AstCallNode {

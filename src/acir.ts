@@ -1,4 +1,4 @@
-import { Type } from "./type.ts";
+import { ProcKind, Type } from "./type.ts";
 
 export type ACModuleInst = {
   inst: "module",
@@ -32,14 +32,14 @@ export type ACProcBodyInst =
   ACProcReturnInst |
   ACEnvDefVarInst |
   ACIfElseInst |
-  ACStrMakeStaticInst |
+  ACStrMakeStaticInst | ACClosureMakeStaticInst |
   ACPushValInst;
 
 export type ACEnvDefVarInst = { inst: "env.defvar", envId: number, varName: string, ty: Type, value: ACPushValInst };
 export type ACEnvLoadInst = { inst: "env.load", envId: number, varName: string };
 export type ACModDefsLoadInst = { inst: "mod_defs.load", varName: string };
 export type ACBuiltinLoadInst = { inst: "builtin.load", varName: string };
-export type ACClosureLoadInst = { inst: "closure.load", id: string }
+export type ACClosureLoadInst = { inst: "closure.load", id: string };
 
 export type ACRootTableInitInst = { inst: "root_table.init", size: number };
 export type ACRootTableRegInst = { inst: "root_table.reg", envId: number, rootTableIdx: number, tmpVarIdx: number };
@@ -61,7 +61,7 @@ export type ACPushValInst =
   ACClosureLoadInst |
   ACEnvLoadInst |
   ACProcFrameLoadTmpInst |
-  ACBuiltinCallInst | ACBuiltinCallWithFrameInst | ACProcCallInst | ACClosureCallInst |
+  ACProcCallInst | ACClosureCallInst |
 
   ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
@@ -70,10 +70,8 @@ export type ACPushValInst =
 
   ACStrConstInst |
 
-  ACClosureMakeInst;
+  ACClosureConstInst | ACClosureMakeInst;
 
-export type ACBuiltinCallInst = { inst: "builtin.call", callee: ACPushValInst, args: ACPushValInst[] };
-export type ACBuiltinCallWithFrameInst = { inst: "builtin.call_with_frame", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACClosureCallInst = { inst: "closure.call", callee: ACPushValInst, args: ACPushValInst[], argTypes: Type[], bodyType: Type };
 
@@ -101,4 +99,6 @@ export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPush
 export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string, len: number };
 export type ACStrConstInst = { inst: "str.const", id: number };
 
+export type ACClosureMakeStaticInst = { inst: "closure.make_static", id: number, procKind: ProcKind, name: string };
+export type ACClosureConstInst = { inst: "closure.const", id: number };
 export type ACClosureMakeInst = { inst: "closure.make", id: number };
