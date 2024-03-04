@@ -569,7 +569,14 @@ AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t
     exit(1);
   }
 
-  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_SLICE, end - start, src->value + start, src);
+  // スライスが存在できるためには参照先の文字列データがあれば良いので、
+  // 文字列スライスオブジェクトの親を辿って大元の文字列を持ってくる
+  AjisaiString *orig_src = src;
+  while (AJISAI_OBJ_TAG((AjisaiObject *)orig_src) == AJISAI_OBJ_STR_SLICE) {
+      orig_src = orig_src->src;
+  }
+
+  return ajisai_str_new(proc_frame, AJISAI_OBJ_STR_SLICE, end - start, src->value + start, orig_src);
 }
 
 bool ajisai_str_equal(ProcFrame *proc_frame, AjisaiString *left, AjisaiString *right) {
@@ -581,6 +588,8 @@ bool ajisai_str_equal(ProcFrame *proc_frame, AjisaiString *left, AjisaiString *r
 AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_t count) {
   if (count == 0)
     return ajisai_empty_str();
+  if (count == 1)
+    return src;
 
   size_t new_str_len = src->len * count;
   char *new_str_data = malloc(new_str_len + 1);
@@ -590,6 +599,10 @@ AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_
   new_str_data[new_str_len] = '\0';
 
   return ajisai_str_new(proc_frame, AJISAI_OBJ_STR, new_str_len, new_str_data, NULL);
+}
+
+int32_t ajisai_str_len(ProcFrame *proc_frame, AjisaiString *s) {
+    return (int32_t)s->len;
 }
 
 static void ajisai_proc_scan_func(AjisaiMemManager *mem_manager, AjisaiObject *obj) {

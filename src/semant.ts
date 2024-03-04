@@ -115,6 +115,17 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
     }
   );
   defTypeMap.set(
+    "str_len",
+    {
+      tyKind: "proc",
+      procKind: "builtin",
+      // TODO: 戻り値の型は符号なし整数にする
+      argTypes: [{ tyKind: "primitive", name: "str" }],
+      bodyType: { tyKind: "primitive", name: "i32" }
+    }
+  );
+
+  defTypeMap.set(
     "gc_start",
     {
       tyKind: "proc",

@@ -140,6 +140,8 @@ AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t
 bool ajisai_str_equal(ProcFrame *proc_frame, AjisaiString *left, AjisaiString *right);
 // TODO: 反復回数指定のための数値型は符号なし整数にする
 AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_t count);
+// TODO: 戻り値の型は符号なし整数にする
+int32_t ajisai_str_len(ProcFrame *proc_frame, AjisaiString *s);
 
 AjisaiTypeInfo *ajisai_proc_type_info(void);
 AjisaiClosure *ajisai_closure_new(ProcFrame *proc_frame, void *func_ptr, void (*scan_func)(AjisaiMemManager *, AjisaiObject *));
