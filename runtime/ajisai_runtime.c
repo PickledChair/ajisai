@@ -1,5 +1,15 @@
 #include "ajisai_runtime.h"
 
+#define AJISAI_SCAN_PHASE_IS_SUCCESSFULLY_OVER 0
+#define AJISAI_SCAN_PHASE_STILL_CONTINUES 1
+
+#define AJISAI_SUCCESS 0
+#define AJISAI_IS_ERROR(status) (status) < 0
+#define AJISAI_MEMCELL_ALLOCATOR_INIT_FAILED -1
+#define AJISAI_MEMCELL_ALLOCATOR_ADD_BLOCK_FAILED -2
+#define AJISAI_FREE_MEMCELLS_INIT_FAILED -3
+#define AJISAI_MEM_MANAGER_INIT_FAILED -4
+
 static AjisaiMemCellBlock *ajisai_memcell_block_new(size_t memcell_cnt) {
   AjisaiMemCellBlock *block = malloc(sizeof(AjisaiMemCellBlock));
   if (block == NULL)
@@ -26,18 +36,18 @@ static int ajisai_memcell_allocator_add_block(AjisaiMemCellAllocator *allocator)
   AjisaiMemCellBlock *new_block = ajisai_memcell_block_new(AJISAI_BLOCKS_MEMCELL_COUNT);
   if (new_block == NULL) {
     ajisai_memcell_allocator_deinit(allocator);
-    return 1;
+    return AJISAI_MEMCELL_ALLOCATOR_ADD_BLOCK_FAILED;
   }
   new_block->next = allocator->blocks;
   allocator->blocks = new_block;
-  return 0;
+  return AJISAI_SUCCESS;
 }
 
 static int ajisai_memcell_allocator_init(AjisaiMemCellAllocator *allocator) {
   allocator->blocks = NULL;
-  if (ajisai_memcell_allocator_add_block(allocator))
-    return 1;
-  return 0;
+  if (AJISAI_IS_ERROR(ajisai_memcell_allocator_add_block(allocator)))
+    return AJISAI_MEMCELL_ALLOCATOR_INIT_FAILED;
+  return AJISAI_SUCCESS;
 }
 
 static void ajisai_memcell_allocator_deinit(AjisaiMemCellAllocator *allocator) {
@@ -56,7 +66,7 @@ static AjisaiMemCell *ajisai_memcell_allocator_alloc(AjisaiMemCellAllocator *all
     *allocate_block = false;
 
   if (memcell_next_idx >= memcell_count) {
-    if (ajisai_memcell_allocator_add_block(allocator)) {
+    if (AJISAI_IS_ERROR(ajisai_memcell_allocator_add_block(allocator))) {
       return NULL;
     } else {
       if (allocate_block)
@@ -73,13 +83,13 @@ static AjisaiMemCell *ajisai_memcell_allocator_alloc(AjisaiMemCellAllocator *all
 static int ajisai_free_memcells_init(AjisaiFreeMemCells *free_memcells, AjisaiMemCellAllocator *allocator) {
   AjisaiMemCell *bottom_cell = ajisai_memcell_allocator_alloc(allocator, NULL);
   if (bottom_cell == NULL)
-    return 1;
+    return AJISAI_FREE_MEMCELLS_INIT_FAILED;
   bottom_cell->size = 0;
   bottom_cell->data = NULL;
 
   free_memcells->bottom = bottom_cell;
   free_memcells->memcells = NULL;
-  return 0;
+  return AJISAI_SUCCESS;
 }
 
 static AjisaiMemCell *ajisai_free_memcells_pop_memcell(AjisaiFreeMemCells *free_memcells, size_t size) {
@@ -114,9 +124,9 @@ static void ajisai_mem_manager_display_stat(AjisaiMemManager *manager);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 
 int ajisai_mem_manager_init(AjisaiMemManager *manager) {
-  if (ajisai_memcell_allocator_init(&manager->memcell_allocator)
-      || ajisai_free_memcells_init(&manager->free, &manager->memcell_allocator))
-    return 1;
+  if (AJISAI_IS_ERROR(ajisai_memcell_allocator_init(&manager->memcell_allocator))
+      || AJISAI_IS_ERROR(ajisai_free_memcells_init(&manager->free, &manager->memcell_allocator)))
+    return AJISAI_MEM_MANAGER_INIT_FAILED;
 
   manager->free.bottom->next = &manager->free.new_edge;
   manager->free.new_edge.prev = manager->free.bottom;
@@ -130,7 +140,7 @@ int ajisai_mem_manager_init(AjisaiMemManager *manager) {
   ajisai_mem_manager_display_stat(manager);
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 
-  return 0;
+  return AJISAI_SUCCESS;
 }
 
 void ajisai_str_heap_free(AjisaiObject *obj);
@@ -271,7 +281,6 @@ static void ajisai_object_mark_alive(AjisaiObject *obj, AjisaiMemManager *mem_ma
     obj->tag |= AJISAI_BLACK_OBJ;
 }
 
-// NOTE: scan が終了状態の時は何も行わず 1 を返す
 static int ajisai_mem_manager_scan_obj_tree(AjisaiMemManager *manager) {
 #ifdef AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
   printf("[MEMORY MANAGER DEBUG] scan_obj_tree ...\n");
@@ -282,7 +291,7 @@ static int ajisai_mem_manager_scan_obj_tree(AjisaiMemManager *manager) {
   printf("[MEMORY MANAGER DEBUG] scan_obj_tree finished\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 
-    return 1;
+    return AJISAI_SCAN_PHASE_IS_SUCCESSFULLY_OVER;
   }
 
   AjisaiObject *obj = (AjisaiObject *)manager->scan->data->data;
@@ -302,7 +311,7 @@ static int ajisai_mem_manager_scan_obj_tree(AjisaiMemManager *manager) {
   printf("[MEMORY MANAGER DEBUG] scan_obj_tree continue\n");
 #endif // AJISAI_MEMORY_MANAGER_DEBUG_OUTPUT
 
-  return 0;
+  return AJISAI_SCAN_PHASE_STILL_CONTINUES;
 }
 
 static void ajisai_mem_manager_release_from_space(AjisaiMemManager *manager) {
@@ -401,7 +410,8 @@ AjisaiObject *ajisai_object_alloc(ProcFrame *proc_frame, size_t size) {
     cell->data->owner_cell = cell;
   }
 
-  if (mem_manager->gc_in_progress && ajisai_mem_manager_scan_obj_tree(mem_manager) == 0) {
+  if (mem_manager->gc_in_progress
+      && ajisai_mem_manager_scan_obj_tree(mem_manager) == AJISAI_SCAN_PHASE_STILL_CONTINUES) {
     ajisai_mem_manager_append_to_new_space(mem_manager, cell);
   } else {
     if (mem_manager->gc_in_progress) {
@@ -432,7 +442,7 @@ void ajisai_gc_start(ProcFrame *proc_frame) {
     mem_manager->gc_in_progress = true;
     ajisai_proc_frame_scan_roots(proc_frame);
   }
-  while (ajisai_mem_manager_scan_obj_tree(mem_manager) == 0);
+  while (ajisai_mem_manager_scan_obj_tree(mem_manager) == AJISAI_SCAN_PHASE_STILL_CONTINUES);
   ajisai_mem_manager_release_from_space(mem_manager);
   mem_manager->top = mem_manager->scan = mem_manager->free.new_edge.prev;
   mem_manager->gc_in_progress = false;
@@ -473,7 +483,8 @@ static void ajisai_str_scan_func(AjisaiMemManager *mem_manager, AjisaiObject *ob
   AjisaiString *str = (AjisaiString *)obj;
   if (AJISAI_OBJ_TAG(&str->obj_header) == AJISAI_OBJ_STR_SLICE) {
     AjisaiMemCell *cell = AJISAI_OBJ_GET_OWNER_CELL((AjisaiObject *)str->src);
-    if (!AJISAI_IS_GRAY_OBJ((AjisaiObject *)str->src) && !AJISAI_IS_ALIVE_OBJ((AjisaiObject *)str->src, mem_manager)) {
+    if (!AJISAI_IS_GRAY_OBJ((AjisaiObject *)str->src)
+        && !AJISAI_IS_ALIVE_OBJ((AjisaiObject *)str->src, mem_manager)) {
       AJISAI_MEMCELL_POP_OWN(mem_manager, cell);
       // 今後のスキャン対象としてマーク
       ((AjisaiObject *)str->src)->tag |= AJISAI_GRAY_OBJ;
