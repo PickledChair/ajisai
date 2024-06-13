@@ -70,7 +70,7 @@ void ajisai_mem_manager_append_to_to_space(AjisaiMemManager *manager, AjisaiMemC
 typedef enum {
   AJISAI_OBJ_STR,
   AJISAI_OBJ_STR_SLICE,
-  AJISAI_OBJ_PROC,
+  AJISAI_OBJ_FUNC,
 } AjisaiObjTag;
 
 enum {
@@ -114,34 +114,34 @@ struct AjisaiClosure {
   void (*scan_func)(AjisaiMemManager *, AjisaiObject *);
 };
 
-typedef struct ProcFrame ProcFrame;
-struct ProcFrame {
-  ProcFrame *parent;
+typedef struct AjisaiFuncFrame AjisaiFuncFrame;
+struct AjisaiFuncFrame {
+  AjisaiFuncFrame *parent;
   AjisaiMemManager *mem_manager;
   size_t root_table_size;
   AjisaiObject **root_table;
 };
 
-AjisaiObject *ajisai_object_alloc(ProcFrame *proc_frame, size_t size);
-void ajisai_gc_start(ProcFrame *proc_frame);
+AjisaiObject *ajisai_object_alloc(AjisaiFuncFrame *func_frame, size_t size);
+void ajisai_gc_start(AjisaiFuncFrame *func_frame);
 
-void ajisai_print_i32(ProcFrame *proc_frame, int32_t value);
-void ajisai_println_i32(ProcFrame *proc_frame, int32_t value);
-void ajisai_print_bool(ProcFrame *proc_frame, bool value);
-void ajisai_println_bool(ProcFrame *proc_frame, bool value);
-void ajisai_print_str(ProcFrame *proc_frame, AjisaiString *value);
-void ajisai_println_str(ProcFrame *proc_frame, AjisaiString *value);
-void ajisai_flush(ProcFrame *proc_frame);
+void ajisai_print_i32(AjisaiFuncFrame *func_frame, int32_t value);
+void ajisai_println_i32(AjisaiFuncFrame *func_frame, int32_t value);
+void ajisai_print_bool(AjisaiFuncFrame *func_frame, bool value);
+void ajisai_println_bool(AjisaiFuncFrame *func_frame, bool value);
+void ajisai_print_str(AjisaiFuncFrame *func_frame, AjisaiString *value);
+void ajisai_println_str(AjisaiFuncFrame *func_frame, AjisaiString *value);
+void ajisai_flush(AjisaiFuncFrame *func_frame);
 
 AjisaiTypeInfo *ajisai_str_type_info(void);
-AjisaiString *ajisai_str_concat(ProcFrame *proc_frame, AjisaiString *a, AjisaiString *b);
+AjisaiString *ajisai_str_concat(AjisaiFuncFrame *func_frame, AjisaiString *a, AjisaiString *b);
 // TODO: 範囲指定のための数値型は符号なし整数にする
-AjisaiString *ajisai_str_slice(ProcFrame *proc_frame, AjisaiString *src, int32_t start, int32_t end);
-bool ajisai_str_equal(ProcFrame *proc_frame, AjisaiString *left, AjisaiString *right);
+AjisaiString *ajisai_str_slice(AjisaiFuncFrame *func_frame, AjisaiString *src, int32_t start, int32_t end);
+bool ajisai_str_equal(AjisaiFuncFrame *func_frame, AjisaiString *left, AjisaiString *right);
 // TODO: 反復回数指定のための数値型は符号なし整数にする
-AjisaiString *ajisai_str_repeat(ProcFrame *proc_frame, AjisaiString *src, int32_t count);
+AjisaiString *ajisai_str_repeat(AjisaiFuncFrame *func_frame, AjisaiString *src, int32_t count);
 // TODO: 戻り値の型は符号なし整数にする
-int32_t ajisai_str_len(ProcFrame *proc_frame, AjisaiString *s);
+int32_t ajisai_str_len(AjisaiFuncFrame *func_frame, AjisaiString *s);
 
-AjisaiTypeInfo *ajisai_proc_type_info(void);
-AjisaiClosure *ajisai_closure_new(ProcFrame *proc_frame, void *func_ptr, void (*scan_func)(AjisaiMemManager *, AjisaiObject *));
+AjisaiTypeInfo *ajisai_func_type_info(void);
+AjisaiClosure *ajisai_closure_new(AjisaiFuncFrame *func_frame, void *func_ptr, void (*scan_func)(AjisaiMemManager *, AjisaiObject *));

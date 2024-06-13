@@ -1,6 +1,6 @@
 import { VarEnv } from "./env.ts";
-import { Type, PrimitiveType, tyEqual, mayBeHeapObj, ProcType } from "./type.ts";
-import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstProcNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
+import { Type, PrimitiveType, tyEqual, mayBeHeapObj, FuncType } from "./type.ts";
+import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstFuncNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
 
 export type DefTypeMap = Map<string, Type>;
 
@@ -16,8 +16,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "print_i32",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -25,8 +25,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "println_i32",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -34,8 +34,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "print_bool",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "bool" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -43,8 +43,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "println_bool",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "bool" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -52,8 +52,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "print_str",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -61,8 +61,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "println_str",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -70,8 +70,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "flush",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -79,8 +79,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "str_concat",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
       bodyType: { tyKind: "primitive", name: "str" }
     }
@@ -88,8 +88,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "str_slice",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       // TODO: 範囲指定のための数値型は符号なし整数にする
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }, { tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "str" }
@@ -98,8 +98,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "str_equal",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "str" }],
       bodyType: { tyKind: "primitive", name: "bool" }
     }
@@ -107,8 +107,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "str_repeat",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       // TODO: 反復回数指定のための数値型は符号なし整数にする
       argTypes: [{ tyKind: "primitive", name: "str" }, { tyKind: "primitive", name: "i32" }],
       bodyType: { tyKind: "primitive", name: "str" }
@@ -117,8 +117,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "str_len",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       // TODO: 戻り値の型は符号なし整数にする
       argTypes: [{ tyKind: "primitive", name: "str" }],
       bodyType: { tyKind: "primitive", name: "i32" }
@@ -128,8 +128,8 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   defTypeMap.set(
     "gc_start",
     {
-      tyKind: "proc",
-      procKind: "builtin",
+      tyKind: "func",
+      funcKind: "builtin",
       argTypes: [],
       bodyType: { tyKind: "primitive", name: "()" }
     }
@@ -182,8 +182,8 @@ export class SemanticAnalyzer {
   private analyzeExpr(ast: AstExprNode, varEnv: VarEnv): [AstExprNode, Type] {
     let astTy;
 
-    if (ast.nodeType === "proc") {
-      const [node, ty] = this.analyzeProc(ast, new VarEnv("proc", varEnv));
+    if (ast.nodeType === "func") {
+      const [node, ty] = this.analyzeFunc(ast, new VarEnv("func", varEnv));
       if (varEnv.envKind !== "module") {
         node.rootIdx = varEnv.freshRootId();
       }
@@ -270,7 +270,7 @@ export class SemanticAnalyzer {
     return this.#clsId++;
   }
 
-  private analyzeProc(ast: AstProcNode, varEnv: VarEnv): [AstProcNode, ProcType] {
+  private analyzeFunc(ast: AstFuncNode, varEnv: VarEnv): [AstFuncNode, FuncType] {
     for (const { name, ty } of ast.args) {
       if (ty) {
         varEnv.setVarTy(name, ty);
@@ -291,62 +291,62 @@ export class SemanticAnalyzer {
       } else {
         const { ty: resolvedTy, level } = varEnv.getVarTyAndLevel(name)!;
         if (level !== 0) {
-          throw new Error("not proc arg");
+          throw new Error("not func arg");
         }
         return resolvedTy;
       }
     });
 
-    const procTy: Type = {
-      tyKind: "proc",
-      procKind: varEnv.parent_!.envKind === "module" ? "userdef" : "closure",
+    const funcTy: Type = {
+      tyKind: "func",
+      funcKind: varEnv.parent_!.envKind === "module" ? "userdef" : "closure",
       argTypes,
       bodyType
     };
 
-    const procAst: AstProcNode = {
-      nodeType: "proc",
+    const funcAst: AstFuncNode = {
+      nodeType: "func",
       args: ast.args,
       body: bodyAst,
       envId: varEnv.envId,
       bodyTy: bodyType,
       rootTableSize: varEnv.rootTableSize,
       closureId: varEnv.parent_!.envKind === "module" ? undefined : this.freshClsId(),
-      ty: procTy
+      ty: funcTy
     };
 
-    if (procTy.procKind === "closure") {
+    if (funcTy.funcKind === "closure") {
       this.#additional_defs.push({
         nodeType: "def",
         declare: {
           nodeType: "declare",
-          name: `${procAst.closureId!}`,
-          ty: procTy,
-          value: procAst
+          name: `${funcAst.closureId!}`,
+          ty: funcTy,
+          value: funcAst
         }
       });
     }
 
-    return [procAst, procTy];
+    return [funcAst, funcTy];
   }
 
   private analyzeCall(ast: AstCallNode, varEnv: VarEnv): [AstCallNode, Type] {
-    if (ast.callee.nodeType === "proc") {
-      const [procAst, procTy] = this.analyzeProc(ast.callee, new VarEnv("proc", varEnv));
+    if (ast.callee.nodeType === "func") {
+      const [funcAst, funcTy] = this.analyzeFunc(ast.callee, new VarEnv("func", varEnv));
       const args = [];
-      for (let i = 0; i < procTy.argTypes.length; i++) {
+      for (let i = 0; i < funcTy.argTypes.length; i++) {
         const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);
-        if (!tyEqual(procTy.argTypes[i], argTy)) {
+        if (!tyEqual(funcTy.argTypes[i], argTy)) {
           throw new Error("invalid arg type");
         }
         args.push(argAst);
       }
-      return [{ nodeType: "call", callee: procAst, args, ty: procTy.bodyType, calleeTy: procTy }, procTy.bodyType];
+      return [{ nodeType: "call", callee: funcAst, args, ty: funcTy.bodyType, calleeTy: funcTy }, funcTy.bodyType];
     }
 
     const [varAst, varTy] = this.analyzeExpr(ast.callee, varEnv);
 
-    if (varTy.tyKind !== "proc") {
+    if (varTy.tyKind !== "func") {
       throw new Error("invalid callee type");
     }
 
@@ -385,8 +385,8 @@ export class SemanticAnalyzer {
     // TODO: integerリテラルをi32と対応させているが、今後u32等の他の型も登場させると対応関係が崩れる
     //       リテラルと型の対応が一対一でなくなった時に実装を変える必要がある
     let exprTy = exprTy_;
-    if (exprTy.tyKind === "proc" && exprTy.procKind !== "closure") {
-      exprTy = { ...exprTy_, ...{ procKind: "closure" } };
+    if (exprTy.tyKind === "func" && exprTy.funcKind !== "closure") {
+      exprTy = { ...exprTy_, ...{ funcKind: "closure" } };
     }
     if (ty) {
       if (!tyEqual(ty, exprTy)) {

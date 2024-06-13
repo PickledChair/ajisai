@@ -1,6 +1,6 @@
 import { Token, TokenType } from "./token.ts";
 import { Lexer } from "./lexer.ts";
-import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstExprSeqNode, AstIfNode, AstLetNode, AstModuleNode, AstProcArgNode, AstProcNode, BinOpKind } from "./ast.ts";
+import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstExprSeqNode, AstIfNode, AstLetNode, AstModuleNode, AstFuncArgNode, AstFuncNode, BinOpKind } from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
@@ -13,8 +13,8 @@ export class Parser {
   parse(): AstModuleNode {
     const defs = [];
     while (!this.eat("eof")) {
-      if (this.eat("proc")) {
-        defs.push(this.parseProcDef());
+      if (this.eat("func")) {
+        defs.push(this.parseFuncDef());
       } else {
         throw new Error("invalid definition");
       }
@@ -23,13 +23,13 @@ export class Parser {
     return { nodeType: "module", defs };
   }
 
-  private parseProcDef(): AstDefNode {
+  private parseFuncDef(): AstDefNode {
     const name = this.expect("identifier");
     this.expect("(");
     const args = [];
     if (!this.eat(")")) {
       while (true) {
-        args.push(this.parseProcArg());
+        args.push(this.parseFuncArg());
         if (!this.eat(",")) break;
       }
       this.expect(")");
@@ -47,8 +47,8 @@ export class Parser {
     const declare: AstDeclareNode = {
       nodeType: "declare",
       name: name.value,
-      value: { nodeType: "proc", args, body, envId: -1 },
-      ty: { tyKind: "proc", procKind: "userdef", argTypes, bodyType }
+      value: { nodeType: "func", args, body, envId: -1 },
+      ty: { tyKind: "func", funcKind: "userdef", argTypes, bodyType }
     };
     return { nodeType: "def", declare };
   }
@@ -59,7 +59,7 @@ export class Parser {
       this.expect(")");
       return { tyKind: "primitive", name: "()" };
     } else {
-      if (this.eat("proc")) {
+      if (this.eat("func")) {
         this.expect("(");
 
         const argTypes: Type[] = [];
@@ -76,7 +76,7 @@ export class Parser {
           bodyType = this.parseType();
         }
 
-        return { tyKind: "proc", procKind: "closure", argTypes, bodyType };
+        return { tyKind: "func", funcKind: "closure", argTypes, bodyType };
       }
 
       const tyName = this.expect("identifier").value;
@@ -90,19 +90,19 @@ export class Parser {
     }
   }
 
-  private parseProcArg(): AstProcArgNode {
+  private parseFuncArg(): AstFuncArgNode {
     const name = this.expect("identifier");
     this.expect(":");
     const ty = this.parseType();
-    return { nodeType: "procArg", name: name.value, ty };
+    return { nodeType: "funcArg", name: name.value, ty };
   }
 
   parseExpr(): AstExprNode {
     if (this.eat("|")) {
-      return this.parseProc(false);
+      return this.parseFunc(false);
     }
     if (this.eat("||")) {
-      return this.parseProc(true);
+      return this.parseFunc(true);
     }
     if (this.eat("let")) {
       return this.parseLet();
@@ -163,13 +163,13 @@ export class Parser {
     throw new Error("Could not parse declaration");
   }
 
-  private parseProc(noArgs: boolean): AstProcNode {
+  private parseFunc(noArgs: boolean): AstFuncNode {
     const args = [];
 
     if (!noArgs) {
       if (!this.eat("|")) {
         while (true) {
-          args.push(this.parseProcArg());
+          args.push(this.parseFuncArg());
           if (!this.eat(",")) break;
         }
         this.expect("|");
@@ -184,7 +184,7 @@ export class Parser {
     this.expect("{");
     const body = this.parseExprSeq();
 
-    return { nodeType: "proc", args, body, envId: -1, bodyTy };
+    return { nodeType: "func", args, body, envId: -1, bodyTy };
   }
 
   private parseIf(): AstIfNode {

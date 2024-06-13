@@ -1,4 +1,4 @@
-proc main() {
+func main() {
     println_i32(
         let a = 3,
             b = if a == 2 { 2 } else { 5 }

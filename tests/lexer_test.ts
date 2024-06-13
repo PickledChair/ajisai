@@ -99,15 +99,15 @@ Deno.test("lexing if expression test", () => {
   }
 });
 
-Deno.test("lexing proc definition test", () => {
+Deno.test("lexing func definition test", () => {
   const src = `
-proc main() -> () {
+func main() -> () {
   println_i32(42)
 }`;
   const lexer = new Lexer(src);
 
   const typeAndValues: [TokenType, string][] = [
-    ["proc", "proc"], ["identifier", "main"], ["(", "("], [")", ")"], ["->", "->"], ["(", "("], [")", ")"], ["{", "{"],
+    ["func", "func"], ["identifier", "main"], ["(", "("], [")", ")"], ["->", "->"], ["(", "("], [")", ")"], ["{", "{"],
     ["identifier", "println_i32"], ["(", "("], ["integer", "42"], [")", ")"],
     ["}", "}"]
   ];

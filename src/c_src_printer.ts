@@ -1,4 +1,4 @@
-import { ACEntryInst, ACIfElseInst, ACModuleInst, ACProcBodyInst, ACDeclInst, ACDefInst, ACPushValInst } from "./acir.ts";
+import { ACEntryInst, ACIfElseInst, ACModuleInst, ACFuncBodyInst, ACDeclInst, ACDefInst, ACPushValInst } from "./acir.ts";
 import { toCType } from "./type.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
@@ -18,13 +18,13 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 
     await writer.write(encoder.encode(defaultFileHeader));
 
-    for (const procDecl of module.procDecls) {
-      await printProtoType(writer, encoder, procDecl);
+    for (const funcDecl of module.funcDecls) {
+      await printProtoType(writer, encoder, funcDecl);
     }
 
-    for (const procDef of module.procDefs) {
+    for (const funcDef of module.funcDefs) {
       await writer.write(encoder.encode("\n"));
-      await printProcDef(writer, encoder, procDef);
+      await printFuncDef(writer, encoder, funcDef);
     }
 
     if (module.entry) {
@@ -40,7 +40,7 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 };
 
 const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, decl: ACDeclInst) => {
-  let line = `${toCType(decl.resultType)} ${decl.inst === "proc.decl" ? "userdef" : "closure"}_${decl.procName}(ProcFrame *parent_frame`;
+  let line = `${toCType(decl.resultType)} ${decl.inst === "func.decl" ? "userdef" : "closure"}_${decl.funcName}(AjisaiFuncFrame *parent_frame`;
 
   for (const [argName, argTy] of decl.args) {
     line += `, ${toCType(argTy)} ${argName}`;
@@ -56,18 +56,18 @@ const printEntry = async (writer: WritableStreamDefaultWriter, encoder: TextEnco
   await writer.write(encoder.encode("  AjisaiMemManager mem_manager;\n"));
   // TODO: メモリ確保に失敗した時に終了する処理を入れる
   await writer.write(encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
-  await writer.write(encoder.encode("  ProcFrame *parent_frame = &(ProcFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
+  await writer.write(encoder.encode("  AjisaiFuncFrame *parent_frame = &(AjisaiFuncFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
 
   for (const inst of entry.body) {
-    await printProcBodyInst(writer, encoder, inst);
+    await printFuncBodyInst(writer, encoder, inst);
   }
 
   await writer.write(encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
   await writer.write(encoder.encode("}\n"));
 };
 
-const printProcDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, def: ACDefInst) => {
-  let headLine = `${toCType(def.resultType)} ${def.inst === "proc.def" ? "userdef" : "closure"}_${def.procName}(ProcFrame *parent_frame`;
+const printFuncDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, def: ACDefInst) => {
+  let headLine = `${toCType(def.resultType)} ${def.inst === "func.def" ? "userdef" : "closure"}_${def.funcName}(AjisaiFuncFrame *parent_frame`;
   for (const [argName, argTy] of def.args) {
     headLine += `, ${toCType(argTy)} env${def.envId}_var_${argName}`;
   }
@@ -75,13 +75,13 @@ const printProcDef = async (writer: WritableStreamDefaultWriter, encoder: TextEn
   await writer.write(encoder.encode(headLine));
 
   for (const inst of def.body) {
-    await printProcBodyInst(writer, encoder, inst);
+    await printFuncBodyInst(writer, encoder, inst);
   }
 
   await writer.write(encoder.encode("}\n"));
 };
 
-const printProcBodyInst = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, inst: ACProcBodyInst) => {
+const printFuncBodyInst = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, inst: ACFuncBodyInst) => {
   let line = "";
 
   switch (inst.inst) {
@@ -94,32 +94,32 @@ const printProcBodyInst = async (writer: WritableStreamDefaultWriter, encoder: T
     case "root_table.unreg":
       line = `  root_table[${inst.idx}] = NULL;\n`;
       break;
-    case "proc_frame.init":
-      line = `  ProcFrame proc_frame = { .parent = parent_frame, .mem_manager = parent_frame->mem_manager, .root_table_size = ${inst.rootTableSize}`;
+    case "func_frame.init":
+      line = `  AjisaiFuncFrame func_frame = { .parent = parent_frame, .mem_manager = parent_frame->mem_manager, .root_table_size = ${inst.rootTableSize}`;
       if (inst.rootTableSize > 0) {
         line += ", .root_table = root_table";
       }
       line += " };\n";
       break;
-    case "proc.return":
+    case "func.return":
       line = `  return ${makePushValLiteral(inst.value)};\n`;
       break;
     case "env.defvar":
       line = `  ${toCType(inst.ty)} env${inst.envId}_var_${inst.varName} = ${makePushValLiteral(inst.value)};\n`;
       break;
-    case "proc_frame.deftmp":
+    case "func_frame.deftmp":
       line = `  ${toCType(inst.ty)} env${inst.envId}_tmp${inst.idx} = ${makePushValLiteral(inst.value)};\n`;
       break;
-    case "proc_frame.deftmp_noval":
+    case "func_frame.deftmp_noval":
       line = `  ${toCType(inst.ty)} env${inst.envId}_tmp${inst.idx};\n`;
       break;
-    case "proc_frame.store_tmp":
+    case "func_frame.store_tmp":
       line = `  env${inst.envId}_tmp${inst.idx} = ${makePushValLiteral(inst.value)};\n`;
       break;
     case "ifelse":
       await printIfElse(writer, encoder, inst);
       return;
-    case "proc.call":
+    case "func.call":
     case "closure.call":
       line = `  ${makePushValLiteral(inst)};\n`;
       break;
@@ -127,7 +127,7 @@ const printProcBodyInst = async (writer: WritableStreamDefaultWriter, encoder: T
       line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR }, .len = ${inst.len}, .value = ${inst.value} };\n  static_str${inst.id}.obj_header.type_info = ajisai_str_type_info();\n`;
       break;
     case "closure.make_static":
-      line = `  static AjisaiClosure static_closure${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_PROC }, .func_ptr = ${inst.procKind === "builtin" ? "ajisai" : "userdef"}_${inst.name} };\n  static_closure${inst.id}.obj_header.type_info = ajisai_proc_type_info();\n`;
+      line = `  static AjisaiClosure static_closure${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_FUNC }, .func_ptr = ${inst.funcKind === "builtin" ? "ajisai" : "userdef"}_${inst.name} };\n  static_closure${inst.id}.obj_header.type_info = ajisai_func_type_info();\n`;
       break;
     default:
       break;
@@ -146,22 +146,22 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
       return `closure_obj_${inst.id}`;
     case "env.load":
       return `env${inst.envId}_var_${inst.varName}`;
-    case "proc_frame.load_tmp":
+    case "func_frame.load_tmp":
       return `env${inst.envId}_tmp${inst.idx}`;
-    case "proc.call": {
+    case "func.call": {
       const callee = makePushValLiteral(inst.callee);
       const args = inst.args.map(arg => makePushValLiteral(arg));
-      return `${callee}(&proc_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
+      return `${callee}(&func_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
     }
     case "closure.call": {
       const closure = makePushValLiteral(inst.callee);
       const args = inst.args.map(arg => makePushValLiteral(arg));
       const argCTypes = inst.argTypes.map(ty => toCType(ty));
       const bodyCType = toCType(inst.bodyType);
-      return `((${bodyCType} (*)(ProcFrame *${argCTypes.length === 0 ? "" : ", " + argCTypes.join(", ")}))${closure}->func_ptr)(&proc_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
+      return `((${bodyCType} (*)(AjisaiFuncFrame *${argCTypes.length === 0 ? "" : ", " + argCTypes.join(", ")}))${closure}->func_ptr)(&func_frame${args.length === 0 ? "" : ", " + args.join(", ")})`;
     }
     case "closure.make":
-      return `ajisai_closure_new(&proc_frame, closure_${inst.id}, NULL)`;
+      return `ajisai_closure_new(&func_frame, closure_${inst.id}, NULL)`;
     case "i32.const":
     case "bool.const":
       return `${inst.value}`;
@@ -208,13 +208,13 @@ const printIfElse = async (writer: WritableStreamDefaultWriter, encoder: TextEnc
   await writer.write(encoder.encode(`  if (${makePushValLiteral(inst.cond)}) {\n`));
 
   for (const thenInst of inst.then) {
-    await printProcBodyInst(writer, encoder, thenInst);
+    await printFuncBodyInst(writer, encoder, thenInst);
   }
 
   await writer.write(encoder.encode("  } else {\n"));
 
   for (const elseInst of inst.else) {
-    await printProcBodyInst(writer, encoder, elseInst);
+    await printFuncBodyInst(writer, encoder, elseInst);
   }
 
   await writer.write(encoder.encode("  }\n"));

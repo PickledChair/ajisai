@@ -1,35 +1,35 @@
-import { ProcKind, Type } from "./type.ts";
+import { FuncKind, Type } from "./type.ts";
 
 export type ACModuleInst = {
   inst: "module",
-  procDecls: ACDeclInst[],
-  procDefs: ACDefInst[],
+  funcDecls: ACDeclInst[],
+  funcDefs: ACDefInst[],
   entry?: ACEntryInst
 };
 
-export type ACDeclInst = ACProcDeclInst | ACClosureDeclInst;
-export type ACDefInst = ACProcDefInst | ACClosureDefInst;
+export type ACDeclInst = ACFuncDeclInst | ACClosureDeclInst;
+export type ACDefInst = ACFuncDefInst | ACClosureDefInst;
 
-export type ACEntryInst = { inst: "entry", body: ACProcBodyInst[] };
+export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
 
-export type ACProcDeclInst = { inst: "proc.decl", procName: string, args: [string, Type][], resultType: Type };
-export type ACProcDefInst = {
-  inst: "proc.def", procName: string, args: [string, Type][], resultType: Type,
+export type ACFuncDeclInst = { inst: "func.decl", funcName: string, args: [string, Type][], resultType: Type };
+export type ACFuncDefInst = {
+  inst: "func.def", funcName: string, args: [string, Type][], resultType: Type,
   envId: number,
-  body: ACProcBodyInst[]
+  body: ACFuncBodyInst[]
 };
 
-export type ACClosureDeclInst = { inst: "closure.decl", procName: string, args: [string, Type][], resultType: Type };
+export type ACClosureDeclInst = { inst: "closure.decl", funcName: string, args: [string, Type][], resultType: Type };
 export type ACClosureDefInst = {
-  inst: "closure.def", procName: string, args: [string, Type][], resultType: Type,
+  inst: "closure.def", funcName: string, args: [string, Type][], resultType: Type,
   envId: number,
-  body: ACProcBodyInst[]
+  body: ACFuncBodyInst[]
 };
 
-export type ACProcBodyInst =
+export type ACFuncBodyInst =
   ACRootTableInitInst | ACRootTableRegInst | ACRootTableUnregInst |
-  ACProcFrameInitInst | ACProcFrameDefTmpInst | ACProcFrameDefTmpNoValInst | ACProcFrameStoreTmpInst |
-  ACProcReturnInst |
+  ACFuncFrameInitInst | ACFuncFrameDefTmpInst | ACFuncFrameDefTmpNoValInst | ACFuncFrameStoreTmpInst |
+  ACFuncReturnInst |
   ACEnvDefVarInst |
   ACIfElseInst |
   ACStrMakeStaticInst | ACClosureMakeStaticInst |
@@ -45,23 +45,23 @@ export type ACRootTableInitInst = { inst: "root_table.init", size: number };
 export type ACRootTableRegInst = { inst: "root_table.reg", envId: number, rootTableIdx: number, tmpVarIdx: number };
 export type ACRootTableUnregInst = { inst: "root_table.unreg", idx: number };
 
-export type ACProcFrameInitInst = { inst: "proc_frame.init", rootTableSize: number };
-export type ACProcFrameDefTmpInst = { inst: "proc_frame.deftmp", envId: number, idx: number, ty: Type, value: ACPushValInst };
-export type ACProcFrameDefTmpNoValInst = { inst: "proc_frame.deftmp_noval", envId: number, idx: number, ty: Type };
-export type ACProcFrameLoadTmpInst = { inst: "proc_frame.load_tmp", envId: number, idx: number };
-export type ACProcFrameStoreTmpInst = { inst: "proc_frame.store_tmp", envId: number, idx: number, value: ACPushValInst };
+export type ACFuncFrameInitInst = { inst: "func_frame.init", rootTableSize: number };
+export type ACFuncFrameDefTmpInst = { inst: "func_frame.deftmp", envId: number, idx: number, ty: Type, value: ACPushValInst };
+export type ACFuncFrameDefTmpNoValInst = { inst: "func_frame.deftmp_noval", envId: number, idx: number, ty: Type };
+export type ACFuncFrameLoadTmpInst = { inst: "func_frame.load_tmp", envId: number, idx: number };
+export type ACFuncFrameStoreTmpInst = { inst: "func_frame.store_tmp", envId: number, idx: number, value: ACPushValInst };
 
-export type ACProcReturnInst = { inst: "proc.return", value: ACPushValInst };
+export type ACFuncReturnInst = { inst: "func.return", value: ACPushValInst };
 
-export type ACIfElseInst = { inst: "ifelse", cond: ACPushValInst, then: ACProcBodyInst[], else: ACProcBodyInst[] };
+export type ACIfElseInst = { inst: "ifelse", cond: ACPushValInst, then: ACFuncBodyInst[], else: ACFuncBodyInst[] };
 
 export type ACPushValInst =
   ACBuiltinLoadInst |
   ACModDefsLoadInst |
   ACClosureLoadInst |
   ACEnvLoadInst |
-  ACProcFrameLoadTmpInst |
-  ACProcCallInst | ACClosureCallInst |
+  ACFuncFrameLoadTmpInst |
+  ACFuncCallInst | ACClosureCallInst |
 
   ACI32ConstInst | ACI32NegInst | ACI32AddInst | ACI32SubInst | ACI32MulInst | ACI32DivInst | ACI32ModInst |
   ACI32EqInst | ACI32NeInst | ACI32LtInst | ACI32LeInst | ACI32GtInst | ACI32GeInst |
@@ -72,7 +72,7 @@ export type ACPushValInst =
 
   ACClosureConstInst | ACClosureMakeInst;
 
-export type ACProcCallInst = { inst: "proc.call", callee: ACPushValInst, args: ACPushValInst[] };
+export type ACFuncCallInst = { inst: "func.call", callee: ACPushValInst, args: ACPushValInst[] };
 export type ACClosureCallInst = { inst: "closure.call", callee: ACPushValInst, args: ACPushValInst[], argTypes: Type[], bodyType: Type };
 
 export type ACI32ConstInst = { inst: "i32.const", value: number };
@@ -99,6 +99,6 @@ export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPush
 export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string, len: number };
 export type ACStrConstInst = { inst: "str.const", id: number };
 
-export type ACClosureMakeStaticInst = { inst: "closure.make_static", id: number, procKind: ProcKind, name: string };
+export type ACClosureMakeStaticInst = { inst: "closure.make_static", id: number, funcKind: FuncKind, name: string };
 export type ACClosureConstInst = { inst: "closure.const", id: number };
 export type ACClosureMakeInst = { inst: "closure.make", id: number };

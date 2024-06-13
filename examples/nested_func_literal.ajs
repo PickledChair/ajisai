@@ -1,4 +1,4 @@
-proc main() {
+func main() {
     let t0 = || {
         println_str("t0 start");
         let t1 = || {

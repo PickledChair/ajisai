@@ -1,25 +1,25 @@
-proc print_proc_result(a: i32, b: i32, p: proc(i32, i32) -> i32) {
+func print_func_result(a: i32, b: i32, p: func(i32, i32) -> i32) {
     println_i32(p(a, b))
 }
 
-proc get_sub_proc() -> proc(i32, i32) -> i32 {
+func get_sub_func() -> func(i32, i32) -> i32 {
     |a: i32, b: i32| -> i32 { a - b }
 }
 
-proc div_proc(a: i32, b: i32) -> i32 {
+func div_func(a: i32, b: i32) -> i32 {
     a / b
 }
 
-proc main() {
+func main() {
     let
         a   = 10,
         b   = 5,
         add = |a: i32, b: i32| -> i32 { a + b },
         mul = |a: i32, b: i32| -> i32 { a * b }
     {
-        print_proc_result(a, b, add);
-        print_proc_result(a, b, get_sub_proc());
-        print_proc_result(a, b, mul);
-        print_proc_result(a, b, div_proc)
+        print_func_result(a, b, add);
+        print_func_result(a, b, get_sub_func());
+        print_func_result(a, b, mul);
+        print_func_result(a, b, div_func)
     }
 }

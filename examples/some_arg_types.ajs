@@ -1,4 +1,4 @@
-proc select_print(left: i32, right: i32, select_left: bool) {
+func select_print(left: i32, right: i32, select_left: bool) {
     if select_left {
         println_i32(left)
     } else {
@@ -6,6 +6,6 @@ proc select_print(left: i32, right: i32, select_left: bool) {
     }
 }
 
-proc main() {
+func main() {
     select_print(1, 2, true)
 }

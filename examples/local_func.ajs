@@ -1,4 +1,4 @@
-proc main() {
+func main() {
     let concat = |a: str, b: str| -> str { str_concat(a, b) }
     {
         println_str(concat("Hello, ", "world!"))

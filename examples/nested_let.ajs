@@ -1,4 +1,4 @@
-proc main() {
+func main() {
     let a = 2,
         b = let { 3 + a }
     {
