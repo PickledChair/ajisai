@@ -332,7 +332,8 @@ export class SemanticAnalyzer {
 
   private analyzeCall(ast: AstCallNode, varEnv: VarEnv): [AstCallNode, Type] {
     if (ast.callee.nodeType === "func") {
-      const [funcAst, funcTy] = this.analyzeFunc(ast.callee, new VarEnv("func", varEnv));
+      const [funcAst, funcTy] = this.analyzeExpr(ast.callee, varEnv);
+      if (funcTy.tyKind !== "func") throw Error("unreachable");
       const args = [];
       for (let i = 0; i < funcTy.argTypes.length; i++) {
         const [argAst, argTy] = this.analyzeExpr(ast.args[i], varEnv);

@@ -306,22 +306,13 @@ class FuncCodeGenerator {
       // unit value は引数として渡さない
     }
 
-    if (ast.callee.nodeType === "func") {
-      if (ast.ty!.tyKind !== "func") {
-        throw new Error("mismatch type: ${ast.ty}");
-      }
-      return {
-        prelude: prelude.length === 0 ? undefined : prelude,
-        valInst: { inst: "closure.call", callee: calleeValInst!, args, argTypes: ast.ty!.argTypes, bodyType: ast.ty!.bodyType }
-      };
-    }
-
-    const varTy = ast.calleeTy!;
+    const calleeIsFuncLiteral = ast.callee.nodeType === "func";
+    const varTy = ast.calleeTy;
 
     if (varTy && varTy.tyKind === "func") {
       let valInst: ACPushValInst;
 
-      if (varTy.funcKind === "closure") {
+      if (calleeIsFuncLiteral || varTy.funcKind === "closure") {
         valInst = { inst: "closure.call", callee: calleeValInst!, args, argTypes: varTy.argTypes, bodyType: varTy.bodyType };
       } else {
         valInst = { inst: "func.call", callee: calleeValInst!, args };
