@@ -1,8 +1,8 @@
-proc add(a: i32, b: i32) -> i32 {
+func add(a: i32, b: i32) -> i32 {
     a + b
 }
 
-proc main() {
+func main() {
     let
         a =
             let a = 1, b = 2 {

@@ -1,8 +1,8 @@
-proc fizzbuzz(start: i32, end: i32) {
+func fizzbuzz(start: i32, end: i32) {
     fizzbuzz_iter(start, end)
 }
 
-proc fizzbuzz_iter(cur: i32, end: i32) {
+func fizzbuzz_iter(cur: i32, end: i32) {
     if cur == end + 1 {
         ()
     } else {
@@ -19,6 +19,6 @@ proc fizzbuzz_iter(cur: i32, end: i32) {
     }
 }
 
-proc main() {
+func main() {
     fizzbuzz(1, 100)
 }

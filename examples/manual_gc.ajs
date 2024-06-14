@@ -1,4 +1,4 @@
-proc print_repeated_str(src: str, count: i32) {
+func print_repeated_str(src: str, count: i32) {
     println_str(str_slice(src, 0, count));
     if count != 0 {
         print_repeated_str(src, count - 1)
@@ -7,7 +7,7 @@ proc print_repeated_str(src: str, count: i32) {
     }
 }
 
-proc main() {
+func main() {
     print_repeated_str("Hoge", 4);
     gc_start();
     print_repeated_str("Fuga", 4);

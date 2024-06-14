@@ -2,22 +2,22 @@ import { Type } from "./type.ts";
 
 export type AstNodeType =
   "module"
-  | "def" | "proc" | "procArg" | "declare" | "if" | "let"
+  | "def" | "func" | "funcArg" | "declare" | "if" | "let"
   | "binary" | "unary" | "call" | "bool" | "integer" | "string" | "variable" | "unit";
 
-export type AstNode = AstModuleNode | AstDefNode | AstProcArgNode | AstDeclareNode | AstExprNode;
+export type AstNode = AstModuleNode | AstDefNode | AstFuncArgNode | AstDeclareNode | AstExprNode;
 
 export type AstModuleNode = { nodeType: "module", defs: AstDefNode[] };
 
 export type AstDefNode = { nodeType: "def", declare: AstDeclareNode };
 
 export type AstExprNode = AstExprSeqNode |
-  AstProcNode | AstIfNode | AstLetNode | AstCallNode | AstBinaryNode | AstUnaryNode | AstBoolNode | AstIntegerNode | AstStringLitNode | AstVariableNode | AstUnitNode;
+  AstFuncNode | AstIfNode | AstLetNode | AstCallNode | AstBinaryNode | AstUnaryNode | AstBoolNode | AstIntegerNode | AstStringLitNode | AstVariableNode | AstUnitNode;
 
 export type AstExprSeqNode = { nodeType: "exprSeq", exprs: AstExprNode[], ty?: Type };
 
-export type AstProcNode = { nodeType: "proc", args: AstProcArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type, rootTableSize?: number, closureId?: number, ty?: Type, rootIdx?: number };
-export type AstProcArgNode = { nodeType: "procArg", name: string, ty?: Type };
+export type AstFuncNode = { nodeType: "func", args: AstFuncArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type, rootTableSize?: number, closureId?: number, ty?: Type, rootIdx?: number };
+export type AstFuncArgNode = { nodeType: "funcArg", name: string, ty?: Type };
 
 export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number, rootIdx?: number, rootIndices?: number[] };
 

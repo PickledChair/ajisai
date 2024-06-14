@@ -1,8 +1,8 @@
-proc countup(until: i32) {
+func countup(until: i32) {
     countup_inner(0, until)
 }
 
-proc countup_inner(x: i32, until: i32) {
+func countup_inner(x: i32, until: i32) {
     if x <= until {
         println_i32(x);
         countup_inner(x + 1, until)
@@ -11,6 +11,6 @@ proc countup_inner(x: i32, until: i32) {
     }
 }
 
-proc main() {
+func main() {
     countup(10)
 }

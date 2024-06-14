@@ -1,4 +1,4 @@
-proc print_equal(src: str, value: str, count: i32, end: i32) {
+func print_equal(src: str, value: str, count: i32, end: i32) {
     if count == end {
         ()
     } else {
@@ -10,6 +10,6 @@ proc print_equal(src: str, value: str, count: i32, end: i32) {
     }
 }
 
-proc main() {
+func main() {
     print_equal("Hoge", "HogeHogeHogeHoge", 0, 10)
 }

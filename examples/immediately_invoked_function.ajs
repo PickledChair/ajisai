@@ -1,0 +1,3 @@
+func main() {
+    func() { println_str("hello!") }()
+}

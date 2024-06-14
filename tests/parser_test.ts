@@ -193,8 +193,8 @@ Deno.test("parsing 'else if' test", () => {
   );
 });
 
-Deno.test("parsing proc definition test", () => {
-  const lexer = new Lexer("proc add(a: i32, b: i32) -> i32 { a + b }");
+Deno.test("parsing func definition test", () => {
+  const lexer = new Lexer("func add(a: i32, b: i32) -> i32 { a + b }");
   const parser = new Parser(lexer);
   const ast = parser.parse();
 
@@ -209,8 +209,8 @@ Deno.test("parsing proc definition test", () => {
             nodeType: "declare",
             name: "add",
             ty: {
-              tyKind: "proc",
-              procKind: "userdef",
+              tyKind: "func",
+              funcKind: "userdef",
               argTypes: [
                 {
                   tyKind: "primitive",
@@ -227,10 +227,10 @@ Deno.test("parsing proc definition test", () => {
               }
             },
             value: {
-              nodeType: "proc",
+              nodeType: "func",
               args: [
-                { nodeType: "procArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
-                { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
+                { nodeType: "funcArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
+                { nodeType: "funcArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
               ],
               body: {
                 nodeType: "exprSeq",
@@ -272,8 +272,8 @@ Deno.test("parsing call expression test", () => {
   );
 });
 
-Deno.test("parsing empty main proc test", () => {
-  const lexer = new Lexer("proc main() { () }");
+Deno.test("parsing empty main func test", () => {
+  const lexer = new Lexer("func main() { () }");
   const parser = new Parser(lexer);
   const ast = parser.parse();
 
@@ -288,8 +288,8 @@ Deno.test("parsing empty main proc test", () => {
             nodeType: "declare",
             name: "main",
             ty: {
-              tyKind: "proc",
-              procKind: "userdef",
+              tyKind: "func",
+              funcKind: "userdef",
               argTypes: [],
               bodyType: {
                 tyKind: "primitive",
@@ -297,7 +297,7 @@ Deno.test("parsing empty main proc test", () => {
               }
             },
             value: {
-              nodeType: "proc",
+              nodeType: "func",
               args: [],
               body: { nodeType: "exprSeq", exprs: [{ nodeType: "unit" }] },
               envId: -1
@@ -309,8 +309,8 @@ Deno.test("parsing empty main proc test", () => {
   );
 });
 
-Deno.test("parsing proc definition (with expression sequence) test", () => {
-  const lexer = new Lexer("proc add_with_display(a: i32, b: i32) -> i32 { println_i32(a + b); a + b }");
+Deno.test("parsing func definition (with expression sequence) test", () => {
+  const lexer = new Lexer("func add_with_display(a: i32, b: i32) -> i32 { println_i32(a + b); a + b }");
   const parser = new Parser(lexer);
   const ast = parser.parse();
 
@@ -325,8 +325,8 @@ Deno.test("parsing proc definition (with expression sequence) test", () => {
             nodeType: "declare",
             name: "add_with_display",
             ty: {
-              tyKind: "proc",
-              procKind: "userdef",
+              tyKind: "func",
+              funcKind: "userdef",
               argTypes: [
                 {
                   tyKind: "primitive",
@@ -343,10 +343,10 @@ Deno.test("parsing proc definition (with expression sequence) test", () => {
               }
             },
             value: {
-              nodeType: "proc",
+              nodeType: "func",
               args: [
-                { nodeType: "procArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
-                { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
+                { nodeType: "funcArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
+                { nodeType: "funcArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
               ],
               body: {
                 nodeType: "exprSeq",
@@ -378,8 +378,8 @@ Deno.test("parsing proc definition (with expression sequence) test", () => {
   );
 });
 
-Deno.test("parsing proc expression test", () => {
-  const lexer = new Lexer("let add = |a: i32, b: i32| -> i32 { a + b } { add(1, 2) }");
+Deno.test("parsing func expression test", () => {
+  const lexer = new Lexer("let add = func(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -392,10 +392,10 @@ Deno.test("parsing proc expression test", () => {
           nodeType: "declare",
           name: "add",
           value: {
-            nodeType: "proc",
+            nodeType: "func",
             args: [
-              { nodeType: "procArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
-              { nodeType: "procArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
+              { nodeType: "funcArg", name: "a", ty: { tyKind: "primitive", name: "i32" } },
+              { nodeType: "funcArg", name: "b", ty: { tyKind: "primitive", name: "i32" } }
             ],
             body: {
               nodeType: "exprSeq",
@@ -431,8 +431,8 @@ Deno.test("parsing proc expression test", () => {
   );
 });
 
-Deno.test("parsing proc expression (without arguments) test", () => {
-  const lexer = new Lexer("let hello = || { println_str(\"Hello, world!\") } { hello() }");
+Deno.test("parsing func expression (without arguments) test", () => {
+  const lexer = new Lexer("let hello = func() { println_str(\"Hello, world!\") } { hello() }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -445,7 +445,7 @@ Deno.test("parsing proc expression (without arguments) test", () => {
           nodeType: "declare",
           name: "hello",
           value: {
-            nodeType: "proc",
+            nodeType: "func",
             args: [],
             body: {
               nodeType: "exprSeq",
@@ -473,6 +473,36 @@ Deno.test("parsing proc expression (without arguments) test", () => {
         ]
       },
       envId: -1
+    }
+  );
+});
+
+Deno.test("parsing immediately invoked function test", () => {
+  const lexer = new Lexer("func() { println_str(\"Hello, world!\") }()");
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "call",
+      callee: {
+        nodeType: "func",
+        args: [],
+        body: {
+          nodeType: "exprSeq",
+          exprs: [
+            {
+              nodeType: "call",
+              callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+              args: [{ nodeType: "string", value: '"Hello, world!"', len: 0 }]
+            }
+          ]
+        },
+        envId: -1,
+        bodyTy: { tyKind: "primitive", name: "()" }
+      },
+      args: []
     }
   );
 });

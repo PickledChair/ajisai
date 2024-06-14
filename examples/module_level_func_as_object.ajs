@@ -1,12 +1,12 @@
-proc test_userdef(n: i32) {
+func test_userdef(n: i32) {
     println_i32(n * 2)
 }
 
-proc main() {
+func main() {
     let
         one = println_i32,
         two = test_userdef,
-        three = |n: i32| { println_i32(n * 3) }
+        three = func(n: i32) { println_i32(n * 3) }
     {
         one(10);
         two(10);

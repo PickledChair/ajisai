@@ -2,7 +2,7 @@ import { Type } from "./type.ts";
 
 let freshEnvId = 0;
 
-export type EnvKind = "module" | "proc" | "let";
+export type EnvKind = "module" | "func" | "let";
 
 export class VarEnv {
   envId: number;
@@ -20,7 +20,7 @@ export class VarEnv {
 
   private incrementTmpId(): number {
     switch (this.envKind) {
-      case "proc":
+      case "func":
         return this.#freshRootId++;
       case "module":
         throw new Error("module level environment doesn't have root table");

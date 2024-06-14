@@ -2,10 +2,10 @@ import {
   ACClosureMakeInst,
   ACEntryInst,
   ACModuleInst,
-  ACProcBodyInst,
+  ACFuncBodyInst,
   ACDeclInst,
   ACDefInst,
-  ACProcFrameDefTmpNoValInst,
+  ACFuncFrameDefTmpNoValInst,
   ACPushValInst
 } from "./acir.ts";
 
@@ -17,13 +17,19 @@ import {
   AstIfNode,
   AstLetNode,
   AstModuleNode,
-  AstProcNode,
+  AstFuncNode,
   AstUnaryNode,
   AstVariableNode
 } from "./ast.ts";
 
 import { DefTypeMap } from "./semant.ts";
-import { PrimitiveType, ProcType, Type, mayBeHeapObj, tyEqual } from "./type.ts";
+import {
+  PrimitiveType,
+  FuncType,
+  Type,
+  mayBeHeapObj,
+  tyEqual
+} from "./type.ts";
 
 export class CodeGenerator {
   #module: AstModuleNode;
@@ -35,42 +41,42 @@ export class CodeGenerator {
   }
 
   codegen(): ACModuleInst {
-    const procDecls = [];
-    const procDefs = [];
+    const funcDecls = [];
+    const funcDefs = [];
     let entry = undefined;
 
     for (const def of this.#module.defs) {
-      if (def.declare.ty!.tyKind === "proc") {
-        const procCodeGen = new ProcCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstProcNode);
-        const [procDecl, procDef] = procCodeGen.codegen(this.#defTypeMap);
-        if (procDecl) procDecls.push(procDecl);
-        if (procDef.inst === "proc.def" || procDef.inst === "closure.def") {
-          procDefs.push(procDef);
-        } else if (procDef.inst === "entry") {
-          entry = procDef;
+      if (def.declare.ty!.tyKind === "func") {
+        const funcCodeGen = new FuncCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstFuncNode);
+        const [funcDecl, funcDef] = funcCodeGen.codegen(this.#defTypeMap);
+        if (funcDecl) funcDecls.push(funcDecl);
+        if (funcDef.inst === "func.def" || funcDef.inst === "closure.def") {
+          funcDefs.push(funcDef);
+        } else if (funcDef.inst === "entry") {
+          entry = funcDef;
         }
       }
     }
 
-    return { inst: "module", procDecls, procDefs, entry };
+    return { inst: "module", funcDecls, funcDefs, entry };
   }
 }
 
-type EnvContext = { envId: number, isProcEnv: boolean };
+type EnvContext = { envId: number, isFuncEnv: boolean };
 
-class ProcContext {
-  procName: string;
+class FuncContext {
+  funcName: string;
   #envStack: EnvContext[];
   #freshTmpId = 0;
 
-  constructor(procName: string, envId: number) {
-    this.procName = procName;
+  constructor(funcName: string, envId: number) {
+    this.funcName = funcName;
     this.#envStack = [];
-    this.#envStack.push({ envId, isProcEnv: true });
+    this.#envStack.push({ envId, isFuncEnv: true });
   }
 
   enterScope(envId: number) {
-    this.#envStack.push({ envId, isProcEnv: false });
+    this.#envStack.push({ envId, isFuncEnv: false });
   }
 
   leaveScope() {
@@ -81,22 +87,22 @@ class ProcContext {
     return this.#envStack.at(-1)!.envId;
   }
 
-  get freshProcTmpId(): number {
+  get freshFuncTmpId(): number {
     return this.#freshTmpId++;
   }
 
-  currentEnvIsProc(): boolean {
-    return this.#envStack.at(-1)!.isProcEnv;
+  currentEnvIsFunc(): boolean {
+    return this.#envStack.at(-1)!.isFuncEnv;
   }
 
-  get procEnvId(): number {
+  get funcEnvId(): number {
     return this.#envStack.at(0)!.envId;
   }
 }
 
 const getExprType = (expr: AstExprNode): Type | undefined => {
   switch (expr.nodeType) {
-    case "proc": return expr.ty;
+    case "func": return expr.ty;
     case "if": return expr.ty;
     case "let": return expr.bodyTy;
     case "exprSeq": return expr.ty;
@@ -111,72 +117,72 @@ const getExprType = (expr: AstExprNode): Type | undefined => {
   }
 };
 
-class ProcCodeGenerator {
-  #procTy: ProcType;
-  #procNode: AstProcNode;
-  #procCtx: ProcContext;
+class FuncCodeGenerator {
+  #funcTy: FuncType;
+  #funcNode: AstFuncNode;
+  #funcCtx: FuncContext;
 
-  constructor(procName: string, procTy: ProcType, proc: AstProcNode) {
-    this.#procTy = procTy;
-    this.#procNode = proc;
-    this.#procCtx = new ProcContext(procName, proc.envId);
+  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode) {
+    this.#funcTy = funcTy;
+    this.#funcNode = func;
+    this.#funcCtx = new FuncContext(funcName, func.envId);
   }
 
   codegen(defTypeMap: DefTypeMap): [ACDeclInst | undefined, ACDefInst | ACEntryInst] {
-    const procDeclInst = this.makeProcDeclInst();
+    const funcDeclInst = this.makeFuncDeclInst();
 
-    let bodyInsts: ACProcBodyInst[]  = [];
-    if (this.#procNode.rootTableSize! > 0) {
-      bodyInsts.push({ inst: "root_table.init", size: this.#procNode.rootTableSize! });
+    let bodyInsts: ACFuncBodyInst[]  = [];
+    if (this.#funcNode.rootTableSize! > 0) {
+      bodyInsts.push({ inst: "root_table.init", size: this.#funcNode.rootTableSize! });
     }
-    bodyInsts.push({ inst: "proc_frame.init", rootTableSize: this.#procNode.rootTableSize! });
+    bodyInsts.push({ inst: "func_frame.init", rootTableSize: this.#funcNode.rootTableSize! });
 
-    const { prelude, valInst } = this.codegenExprSeq(this.#procNode.body, defTypeMap);
+    const { prelude, valInst } = this.codegenExprSeq(this.#funcNode.body, defTypeMap);
 
     if (prelude) {
       bodyInsts = bodyInsts.concat(prelude);
     }
 
     if (valInst) {
-      if (tyEqual(procDeclInst.resultType, { tyKind: "primitive", name: "()" })) {
+      if (tyEqual(funcDeclInst.resultType, { tyKind: "primitive", name: "()" })) {
         bodyInsts.push(valInst);
       } else {
-        bodyInsts.push({ inst: "proc.return", value: valInst });
+        bodyInsts.push({ inst: "func.return", value: valInst });
       }
     }
 
-    if (procDeclInst.procName === "main") {
+    if (funcDeclInst.funcName === "main") {
       return [
         undefined,
         { inst: "entry", body: bodyInsts }
       ];
     } else {
       return [
-        procDeclInst,
+        funcDeclInst,
         {
-          inst: this.#procNode.closureId == null ? "proc.def" : "closure.def",
-          procName: procDeclInst.procName,
-          args: procDeclInst.args,
-          resultType: procDeclInst.resultType,
-          envId: this.#procCtx.procEnvId,
+          inst: this.#funcNode.closureId == null ? "func.def" : "closure.def",
+          funcName: funcDeclInst.funcName,
+          args: funcDeclInst.args,
+          resultType: funcDeclInst.resultType,
+          envId: this.#funcCtx.funcEnvId,
           body: bodyInsts
         }
       ];
     }
   }
 
-  private makeProcDeclInst(): ACDeclInst {
+  private makeFuncDeclInst(): ACDeclInst {
     return {
-      inst: this.#procNode.closureId == null ? "proc.decl" : "closure.decl",
-      procName: this.#procCtx.procName,
-      args: this.#procNode.args.map(arg => [arg.name, arg.ty!]),
-      resultType: this.#procTy.bodyType
+      inst: this.#funcNode.closureId == null ? "func.decl" : "closure.decl",
+      funcName: this.#funcCtx.funcName,
+      args: this.#funcNode.args.map(arg => [arg.name, arg.ty!]),
+      resultType: this.#funcTy.bodyType
     };
   }
 
-  private codegenExpr(ast: AstExprNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
+  private codegenExpr(ast: AstExprNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
     switch (ast.nodeType) {
-      case "proc":
+      case "func":
         return this.codegenClosure(ast);
       case "unary":
         return this.codegenUnary(ast, defTypeMap);
@@ -193,7 +199,7 @@ class ProcCodeGenerator {
       case "bool":
         return { valInst: { inst: "bool.const", value: ast.value } };
       case "string": {
-        const strId = this.#procCtx.freshProcTmpId;
+        const strId = this.#funcCtx.freshFuncTmpId;
         return {
           prelude: [{ inst: "str.make_static", id: strId, value: ast.value, len: ast.len }],
           valInst: { inst: "str.const", id: strId }
@@ -208,7 +214,7 @@ class ProcCodeGenerator {
     }
   }
 
-  private codegenUnary(ast: AstUnaryNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst: ACPushValInst } {
+  private codegenUnary(ast: AstUnaryNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
     const { prelude: opePrelude, valInst: opeValInst } = this.codegenExpr(ast.operand, defTypeMap);
     if (opeValInst) {
       if (ast.operator === "-") {
@@ -221,11 +227,11 @@ class ProcCodeGenerator {
     throw new Error("invalid unary node");
   }
 
-  private codegenBinary(ast: AstBinaryNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst: ACPushValInst } {
+  private codegenBinary(ast: AstBinaryNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
     const { prelude: leftPrelude, valInst: leftValInst } = this.codegenExpr(ast.left, defTypeMap);
     const { prelude: rightPrelude, valInst: rightValInst } = this.codegenExpr(ast.right, defTypeMap);
 
-    let prelude: ACProcBodyInst[] | undefined = undefined;
+    let prelude: ACFuncBodyInst[] | undefined = undefined;
     if (leftPrelude || rightPrelude) {
       prelude = [];
       if (leftPrelude) prelude = prelude.concat(leftPrelude);
@@ -273,8 +279,8 @@ class ProcCodeGenerator {
     throw new Error("unimplemented for other type");
   }
 
-  private codegenCall(ast: AstCallNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst: ACPushValInst } {
-    let prelude: ACProcBodyInst[] = [];
+  private codegenCall(ast: AstCallNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
+    let prelude: ACFuncBodyInst[] = [];
     const { prelude: calleePrelude, valInst: calleeValInst } = this.codegenExpr(ast.callee, defTypeMap);
 
     if (calleePrelude) prelude = prelude.concat(calleePrelude);
@@ -285,12 +291,12 @@ class ProcCodeGenerator {
       if (argPrelude) prelude = prelude.concat(argPrelude);
 
       if (arg.nodeType === "variable" &&
-          arg.ty!.tyKind === "proc" &&
-          arg.ty!.procKind !== "closure") {
-        const closureId = this.#procCtx.freshProcTmpId;
+          arg.ty!.tyKind === "func" &&
+          arg.ty!.funcKind !== "closure") {
+        const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({
-          inst: "closure.make_static", id: closureId, procKind: arg.ty!.procKind, name: arg.name
+          inst: "closure.make_static", id: closureId, funcKind: arg.ty!.funcKind, name: arg.name
         });
 
         args.push({ inst: "closure.const", id: closureId });
@@ -300,37 +306,28 @@ class ProcCodeGenerator {
       // unit value は引数として渡さない
     }
 
-    if (ast.callee.nodeType === "proc") {
-      if (ast.ty!.tyKind !== "proc") {
-        throw new Error("mismatch type: ${ast.ty}");
-      }
-      return {
-        prelude: prelude.length === 0 ? undefined : prelude,
-        valInst: { inst: "closure.call", callee: calleeValInst!, args, argTypes: ast.ty!.argTypes, bodyType: ast.ty!.bodyType }
-      };
-    }
+    const calleeIsFuncLiteral = ast.callee.nodeType === "func";
+    const varTy = ast.calleeTy;
 
-    const varTy = ast.calleeTy!;
-
-    if (varTy && varTy.tyKind === "proc") {
+    if (varTy && varTy.tyKind === "func") {
       let valInst: ACPushValInst;
 
-      if (varTy.procKind === "closure") {
+      if (calleeIsFuncLiteral || varTy.funcKind === "closure") {
         valInst = { inst: "closure.call", callee: calleeValInst!, args, argTypes: varTy.argTypes, bodyType: varTy.bodyType };
       } else {
-        valInst = { inst: "proc.call", callee: calleeValInst!, args };
+        valInst = { inst: "func.call", callee: calleeValInst!, args };
       }
 
       if (mayBeHeapObj(varTy.bodyType)) {
-        const tmpId = this.#procCtx.freshProcTmpId;
+        const tmpId = this.#funcCtx.freshFuncTmpId;
 
-        const defTmpInst: ACProcBodyInst = { inst: "proc_frame.deftmp", envId: this.#procCtx.procEnvId, idx: tmpId, ty: ast.ty!, value: valInst };
+        const defTmpInst: ACFuncBodyInst = { inst: "func_frame.deftmp", envId: this.#funcCtx.funcEnvId, idx: tmpId, ty: ast.ty!, value: valInst };
         prelude.push(defTmpInst);
 
-        const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: this.#procCtx.procEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
+        const rootRegInst: ACFuncBodyInst = { inst: "root_table.reg", envId: this.#funcCtx.funcEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
         prelude.push(rootRegInst);
 
-        valInst = { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: tmpId };
+        valInst = { inst: "func_frame.load_tmp", envId: this.#funcCtx.funcEnvId, idx: tmpId };
       }
 
       return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
@@ -343,17 +340,17 @@ class ProcCodeGenerator {
     if (ast.level === -1) {
       const varTy = defTypeMap.get(ast.name);
       if (varTy) {
-        if (varTy.tyKind === "proc") {
-          if (varTy.procKind === "userdef") {
+        if (varTy.tyKind === "func") {
+          if (varTy.funcKind === "userdef") {
             return { valInst: { inst: "mod_defs.load", varName: ast.name } };
-          } else if (varTy.procKind === "closure") {
+          } else if (varTy.funcKind === "closure") {
             return { valInst: { inst: "closure.load", id: ast.name} };
-          } else if (varTy.procKind === "builtin") {
+          } else if (varTy.funcKind === "builtin") {
             return { valInst: { inst: "builtin.load", varName: ast.name } };
           }
           throw new Error("unreachable");
         } else {
-          throw new Error("unimplemented for non-proc def load");
+          throw new Error("unimplemented for non-func def load");
         }
       } else {
         throw new Error(`variable '${ast.name}' not found`);
@@ -363,8 +360,8 @@ class ProcCodeGenerator {
     }
   }
 
-  private codegenExprSeq(ast: AstExprSeqNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
-    let prelude: ACProcBodyInst[] = [];
+  private codegenExprSeq(ast: AstExprSeqNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACFuncBodyInst[] = [];
     let valInst: ACPushValInst | undefined = undefined;
 
     ast.exprs.forEach((expr, idx) => {
@@ -381,14 +378,14 @@ class ProcCodeGenerator {
     return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
   }
 
-  private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude?: ACProcBodyInst[], valInst?: ACPushValInst } {
-    let prelude: ACProcBodyInst[] = [];
+  private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACFuncBodyInst[] = [];
 
-    this.#procCtx.enterScope(ast.envId);
+    this.#funcCtx.enterScope(ast.envId);
 
-    let returnVar: ACProcFrameDefTmpNoValInst | undefined;
+    let returnVar: ACFuncFrameDefTmpNoValInst | undefined;
     if (mayBeHeapObj(ast.bodyTy!)) {
-      returnVar = { inst: "proc_frame.deftmp_noval", envId: this.#procCtx.procEnvId, idx: this.#procCtx.freshProcTmpId, ty: ast.bodyTy! };
+      returnVar = { inst: "func_frame.deftmp_noval", envId: this.#funcCtx.funcEnvId, idx: this.#funcCtx.freshFuncTmpId, ty: ast.bodyTy! };
       prelude.push(returnVar);
     }
 
@@ -396,11 +393,11 @@ class ProcCodeGenerator {
       const { prelude: valPrelude, valInst } = this.codegenExpr(value, defTypeMap);
       if (valPrelude) prelude = prelude.concat(valPrelude);
 
-      if (value.nodeType === "variable" && value.ty!.tyKind === "proc" && value.ty!.procKind !== "closure") {
-        const closureId = this.#procCtx.freshProcTmpId;
+      if (value.nodeType === "variable" && value.ty!.tyKind === "func" && value.ty!.funcKind !== "closure") {
+        const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({
-          inst: "closure.make_static", id: closureId, procKind: value.ty!.procKind, name: value.name
+          inst: "closure.make_static", id: closureId, funcKind: value.ty!.funcKind, name: value.name
         });
 
         prelude.push(
@@ -426,46 +423,46 @@ class ProcCodeGenerator {
 
     if (ast.rootIndices!.length !== 0) {
       for (const idx of ast.rootIndices!) {
-        const unregInst: ACProcBodyInst = { inst: "root_table.unreg", idx };
+        const unregInst: ACFuncBodyInst = { inst: "root_table.unreg", idx };
         prelude.push(unregInst);
       }
     }
 
-    this.#procCtx.leaveScope();
+    this.#funcCtx.leaveScope();
 
     if (returnVar) {
       prelude.push({
-        inst: "proc_frame.store_tmp", envId: returnVar.envId, idx: returnVar.idx, value: valInst!
+        inst: "func_frame.store_tmp", envId: returnVar.envId, idx: returnVar.idx, value: valInst!
       });
 
-      const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: returnVar.envId, rootTableIdx: ast.rootIdx!, tmpVarIdx: returnVar.idx };
+      const rootRegInst: ACFuncBodyInst = { inst: "root_table.reg", envId: returnVar.envId, rootTableIdx: ast.rootIdx!, tmpVarIdx: returnVar.idx };
       prelude.push(rootRegInst);
 
-      return { prelude, valInst: { inst: "proc_frame.load_tmp", envId: returnVar.envId, idx: returnVar.idx } };
+      return { prelude, valInst: { inst: "func_frame.load_tmp", envId: returnVar.envId, idx: returnVar.idx } };
     } else {
       return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
     }
   }
 
-  private codegenIf(ast: AstIfNode, defTypeMap: DefTypeMap): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
-    let prelude: ACProcBodyInst[] = [];
-    const resultTmpId = this.#procCtx.freshProcTmpId;
+  private codegenIf(ast: AstIfNode, defTypeMap: DefTypeMap): { prelude: ACFuncBodyInst[], valInst?: ACPushValInst } {
+    let prelude: ACFuncBodyInst[] = [];
+    const resultTmpId = this.#funcCtx.freshFuncTmpId;
     const isUnitType = tyEqual(ast.ty!, { tyKind: "primitive", name: "()" });
 
     if (!isUnitType) {
       prelude.push(
-        { inst: "proc_frame.deftmp_noval", envId: this.#procCtx.procEnvId, idx: resultTmpId, ty: ast.ty! }
+        { inst: "func_frame.deftmp_noval", envId: this.#funcCtx.funcEnvId, idx: resultTmpId, ty: ast.ty! }
       );
     }
 
     const { prelude: condPrelude, valInst: condValInst } = this.codegenExpr(ast.cond, defTypeMap);
     if (condPrelude) prelude = prelude.concat(condPrelude);
 
-    let thenInsts: ACProcBodyInst[] = [];
+    let thenInsts: ACFuncBodyInst[] = [];
     const { prelude: thenPrelude, valInst: thenValInst } = this.codegenExprSeq(ast.then, defTypeMap);
     if (thenPrelude) thenInsts = thenInsts.concat(thenPrelude);
 
-    let elseInsts: ACProcBodyInst[] = [];
+    let elseInsts: ACFuncBodyInst[] = [];
     const { prelude: elsePrelude, valInst: elseValInst } = this.codegenExprSeq(ast.else, defTypeMap);
     if (elsePrelude) elseInsts = elseInsts.concat(elsePrelude);
 
@@ -474,10 +471,10 @@ class ProcCodeGenerator {
       if (elseValInst) elseInsts.push(elseValInst);
     } else {
       thenInsts.push(
-        { inst: "proc_frame.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: thenValInst! }
+        { inst: "func_frame.store_tmp", envId: this.#funcCtx.funcEnvId, idx: resultTmpId, value: thenValInst! }
       );
       elseInsts.push(
-        { inst: "proc_frame.store_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId, value: elseValInst! }
+        { inst: "func_frame.store_tmp", envId: this.#funcCtx.funcEnvId, idx: resultTmpId, value: elseValInst! }
       );
     }
 
@@ -487,25 +484,25 @@ class ProcCodeGenerator {
 
     return {
       prelude,
-      valInst: isUnitType ? undefined : { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: resultTmpId }
+      valInst: isUnitType ? undefined : { inst: "func_frame.load_tmp", envId: this.#funcCtx.funcEnvId, idx: resultTmpId }
     }
   }
 
-  private codegenClosure(ast: AstProcNode): { prelude: ACProcBodyInst[], valInst?: ACPushValInst } {
+  private codegenClosure(ast: AstFuncNode): { prelude: ACFuncBodyInst[], valInst?: ACPushValInst } {
     if (ast.closureId == null) {
-      throw new Error("local proc definition must have closureId");
+      throw new Error("local func definition must have closureId");
     }
     const closureInst: ACClosureMakeInst = { inst: "closure.make", id: ast.closureId };
 
-    const tmpId = this.#procCtx.freshProcTmpId;
+    const tmpId = this.#funcCtx.freshFuncTmpId;
 
-    const defTmpInst: ACProcBodyInst = { inst: "proc_frame.deftmp", envId: this.#procCtx.procEnvId, idx: tmpId, ty: ast.ty!, value: closureInst };
+    const defTmpInst: ACFuncBodyInst = { inst: "func_frame.deftmp", envId: this.#funcCtx.funcEnvId, idx: tmpId, ty: ast.ty!, value: closureInst };
 
-    const rootRegInst: ACProcBodyInst = { inst: "root_table.reg", envId: this.#procCtx.procEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
+    const rootRegInst: ACFuncBodyInst = { inst: "root_table.reg", envId: this.#funcCtx.funcEnvId, rootTableIdx: ast.rootIdx!, tmpVarIdx: tmpId };
 
     return {
       prelude: [defTmpInst, rootRegInst],
-      valInst: { inst: "proc_frame.load_tmp", envId: this.#procCtx.procEnvId, idx: tmpId }
+      valInst: { inst: "func_frame.load_tmp", envId: this.#funcCtx.funcEnvId, idx: tmpId }
     };
   }
 }

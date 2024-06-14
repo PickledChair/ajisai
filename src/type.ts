@@ -1,4 +1,4 @@
-export type Type = PrimitiveType | ProcType | DummyType;
+export type Type = PrimitiveType | FuncType | DummyType;
 
 const primitiveTypeNames = ["i32", "bool", "str", "()"] as const;
 export type PrimitiveTypeName = (typeof primitiveTypeNames)[number];
@@ -8,15 +8,15 @@ export const isPrimitiveTypeName = (s: string): PrimitiveTypeName | null => {
   return (primitiveTypeNames as Readonly<string[]>).includes(s) ? s as PrimitiveTypeName : null;
 };
 
-export type ProcKind = "userdef" | "closure" | "builtin";
-export type ProcType = { tyKind: "proc", procKind: ProcKind, argTypes: Type[], bodyType: Type };
+export type FuncKind = "userdef" | "closure" | "builtin";
+export type FuncType = { tyKind: "func", funcKind: FuncKind, argTypes: Type[], bodyType: Type };
 
 export type DummyType = { tyKind: "dummy" };
 
 export const tyEqual = (left: Type, right: Type): boolean => {
   if (left.tyKind == "primitive" && right.tyKind == "primitive") {
     return left.name == right.name;
-  } else if (left.tyKind == "proc" && right.tyKind == "proc") {
+  } else if (left.tyKind == "func" && right.tyKind == "func") {
     if (left.argTypes.length !== right.argTypes.length) return false;
 
     for (let i = 0; i < left.argTypes.length; i++) {
@@ -38,7 +38,7 @@ export const toCType = (ty: Type): string => {
       case "str": return "AjisaiString *";
       case "()": return "void";
     }
-  } else if (ty.tyKind === "proc") {
+  } else if (ty.tyKind === "func") {
     return "AjisaiClosure *";
   }
   throw new Error("invalid type");
@@ -55,6 +55,6 @@ export const mayBeHeapObj = (ty: Type): boolean => {
         return true;
     }
   }
-  // proc 等
+  // func 等
   return true;
 };
