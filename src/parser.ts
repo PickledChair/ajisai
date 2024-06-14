@@ -1,6 +1,18 @@
 import { Token, TokenType } from "./token.ts";
 import { Lexer } from "./lexer.ts";
-import { AstCallNode, AstDeclareNode, AstDefNode, AstExprNode, AstExprSeqNode, AstIfNode, AstLetNode, AstModuleNode, AstFuncArgNode, AstFuncNode, BinOpKind } from "./ast.ts";
+import {
+  AstCallNode,
+  AstDeclareNode,
+  AstDefNode,
+  AstExprNode,
+  AstExprSeqNode,
+  AstIfNode,
+  AstLetNode,
+  AstModuleNode,
+  AstFuncArgNode,
+  AstFuncNode,
+  BinOpKind
+} from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
@@ -98,18 +110,6 @@ export class Parser {
   }
 
   parseExpr(): AstExprNode {
-    if (this.eat("|")) {
-      return this.parseFunc(false);
-    }
-    if (this.eat("||")) {
-      return this.parseFunc(true);
-    }
-    if (this.eat("let")) {
-      return this.parseLet();
-    }
-    if (this.eat("if")) {
-      return this.parseIf();
-    }
     return this.parseLogOr();
   }
 
@@ -163,17 +163,15 @@ export class Parser {
     throw new Error("Could not parse declaration");
   }
 
-  private parseFunc(noArgs: boolean): AstFuncNode {
+  private parseFunc(): AstFuncNode {
     const args = [];
 
-    if (!noArgs) {
-      if (!this.eat("|")) {
-        while (true) {
-          args.push(this.parseFuncArg());
-          if (!this.eat(",")) break;
-        }
-        this.expect("|");
+    if (!this.eat(")")) {
+      while (true) {
+        args.push(this.parseFuncArg());
+        if (!this.eat(",")) break;
       }
+      this.expect(")");
     }
 
     let bodyTy: Type = { tyKind: "primitive", name: "()" };
@@ -395,6 +393,22 @@ export class Parser {
     token = this.eat("identifier");
     if (token) {
       expr = { nodeType: "variable", name: token.value, level: -1, fromEnv: -1, toEnv: -1 };
+    }
+
+    token = this.eat("let");
+    if (token) {
+      expr = this.parseLet();
+    }
+
+    token = this.eat("if");
+    if (token) {
+      expr = this.parseIf();
+    }
+
+    token = this.eat("func");
+    if (token) {
+      this.expect("(");
+      expr = this.parseFunc();
     }
 
     if (expr) return this.parsePostfix(expr);

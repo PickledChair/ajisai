@@ -6,7 +6,7 @@ func main() {
     let
         one = println_i32,
         two = test_userdef,
-        three = |n: i32| { println_i32(n * 3) }
+        three = func(n: i32) { println_i32(n * 3) }
     {
         one(10);
         two(10);

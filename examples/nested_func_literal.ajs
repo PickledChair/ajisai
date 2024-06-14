@@ -1,9 +1,9 @@
 func main() {
-    let t0 = || {
+    let t0 = func() {
         println_str("t0 start");
-        let t1 = || {
+        let t1 = func() {
             println_str("t1 start");
-            let t2 = || {
+            let t2 = func() {
                 println_str("t2 start");
                 println_str("t2 end")
             } {

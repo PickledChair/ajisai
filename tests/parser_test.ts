@@ -379,7 +379,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
 });
 
 Deno.test("parsing func expression test", () => {
-  const lexer = new Lexer("let add = |a: i32, b: i32| -> i32 { a + b } { add(1, 2) }");
+  const lexer = new Lexer("let add = func(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -432,7 +432,7 @@ Deno.test("parsing func expression test", () => {
 });
 
 Deno.test("parsing func expression (without arguments) test", () => {
-  const lexer = new Lexer("let hello = || { println_str(\"Hello, world!\") } { hello() }");
+  const lexer = new Lexer("let hello = func() { println_str(\"Hello, world!\") } { hello() }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -473,6 +473,36 @@ Deno.test("parsing func expression (without arguments) test", () => {
         ]
       },
       envId: -1
+    }
+  );
+});
+
+Deno.test("parsing immediately invoked function test", () => {
+  const lexer = new Lexer("func() { println_str(\"Hello, world!\") }()");
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "call",
+      callee: {
+        nodeType: "func",
+        args: [],
+        body: {
+          nodeType: "exprSeq",
+          exprs: [
+            {
+              nodeType: "call",
+              callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+              args: [{ nodeType: "string", value: '"Hello, world!"', len: 0 }]
+            }
+          ]
+        },
+        envId: -1,
+        bodyTy: { tyKind: "primitive", name: "()" }
+      },
+      args: []
     }
   );
 });

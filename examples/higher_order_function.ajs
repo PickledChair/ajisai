@@ -3,7 +3,7 @@ func print_func_result(a: i32, b: i32, p: func(i32, i32) -> i32) {
 }
 
 func get_sub_func() -> func(i32, i32) -> i32 {
-    |a: i32, b: i32| -> i32 { a - b }
+    func(a: i32, b: i32) -> i32 { a - b }
 }
 
 func div_func(a: i32, b: i32) -> i32 {
@@ -14,8 +14,8 @@ func main() {
     let
         a   = 10,
         b   = 5,
-        add = |a: i32, b: i32| -> i32 { a + b },
-        mul = |a: i32, b: i32| -> i32 { a * b }
+        add = func(a: i32, b: i32) -> i32 { a + b },
+        mul = func(a: i32, b: i32) -> i32 { a * b }
     {
         print_func_result(a, b, add);
         print_func_result(a, b, get_sub_func());
