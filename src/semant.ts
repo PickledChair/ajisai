@@ -379,6 +379,7 @@ export class SemanticAnalyzer {
     return [{ nodeType: "let", declares: newDeclares, body: bodyAst, bodyTy, envId: varEnv.envId, rootIndices: varEnv.rootIndices }, bodyTy];
   }
 
+  // NOTE: analyzeDeclare はローカル環境の変数束縛に対してのみ使われている
   private analyzeDeclare(ast: AstDeclareNode, varEnv: VarEnv): AstDeclareNode {
     const { name, ty, value } = ast;
     const [ exprAst, exprTy_ ] = this.analyzeExpr(value, varEnv);
@@ -386,8 +387,10 @@ export class SemanticAnalyzer {
     // TODO: integerリテラルをi32と対応させているが、今後u32等の他の型も登場させると対応関係が崩れる
     //       リテラルと型の対応が一対一でなくなった時に実装を変える必要がある
     let exprTy = exprTy_;
+    // NOTE: この関数はローカル環境の変数束縛のみが対象なので、
+    //       モジュールレベルの関数を束縛したらクロージャに変換しなければならない
     if (exprTy.tyKind === "func" && exprTy.funcKind !== "closure") {
-      exprTy = { ...exprTy_, ...{ funcKind: "closure" } };
+      exprTy = { ...exprTy, funcKind: "closure" };
     }
     if (ty) {
       if (!tyEqual(ty, exprTy)) {
