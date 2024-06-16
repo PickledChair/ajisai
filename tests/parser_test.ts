@@ -117,11 +117,13 @@ Deno.test("parsing let expression test", () => {
         {
           nodeType: "declare",
           name: "a",
+          ty: undefined,
           value: { nodeType: "integer", value: 1 }
         },
         {
           nodeType: "declare",
           name: "b",
+          ty: undefined,
           value: { nodeType: "integer", value: 2 }
         }
       ],
@@ -242,6 +244,7 @@ Deno.test("parsing func definition test", () => {
                   }
                 ]
               },
+              bodyTy: { tyKind: "primitive", name: "i32" },
               envId: -1
             }
           }
@@ -300,6 +303,7 @@ Deno.test("parsing empty main func test", () => {
               nodeType: "func",
               args: [],
               body: { nodeType: "exprSeq", exprs: [{ nodeType: "unit" }] },
+              bodyTy: { tyKind: "primitive", name: "()" },
               envId: -1
             }
           }
@@ -369,6 +373,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
                   }
                 ]
               },
+              bodyTy: { tyKind: "primitive", name: "i32" },
               envId: -1
             }
           }
@@ -391,6 +396,7 @@ Deno.test("parsing func expression test", () => {
         {
           nodeType: "declare",
           name: "add",
+          ty: undefined,
           value: {
             nodeType: "func",
             args: [
@@ -444,6 +450,7 @@ Deno.test("parsing func expression (without arguments) test", () => {
         {
           nodeType: "declare",
           name: "hello",
+          ty: undefined,
           value: {
             nodeType: "func",
             args: [],
@@ -503,6 +510,77 @@ Deno.test("parsing immediately invoked function test", () => {
         bodyTy: { tyKind: "primitive", name: "()" }
       },
       args: []
+    }
+  );
+});
+
+Deno.test("parsing val definition test", () => {
+  const lexer = new Lexer("val a: i32 = 1 + 2;");
+  const parser = new Parser(lexer);
+  const ast = parser.parse();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "module",
+      defs: [
+        {
+          nodeType: "def",
+          declare: {
+            nodeType: "declare",
+            name: "a",
+            ty: {
+              tyKind: "primitive",
+              name: "i32"
+            },
+            value: {
+              nodeType: "binary",
+              operator: "+",
+                  left: { nodeType: "integer", value: 1 },
+                  right: { nodeType: "integer", value: 2 }
+
+            }
+          }
+        }
+      ]
+    }
+  );
+});
+
+Deno.test("parsing empty main func (as val definition) test", () => {
+  const lexer = new Lexer("val main: func() = func() { () };");
+  const parser = new Parser(lexer);
+  const ast = parser.parse();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "module",
+      defs: [
+        {
+          nodeType: "def",
+          declare: {
+            nodeType: "declare",
+            name: "main",
+            ty: {
+              tyKind: "func",
+              funcKind: "userdef",
+              argTypes: [],
+              bodyType: {
+                tyKind: "primitive",
+                name: "()"
+              }
+            },
+            value: {
+              nodeType: "func",
+              args: [],
+              body: { nodeType: "exprSeq", exprs: [{ nodeType: "unit" }] },
+              bodyTy: { tyKind: "primitive", name: "()" },
+              envId: -1
+            }
+          }
+        }
+      ]
     }
   );
 });

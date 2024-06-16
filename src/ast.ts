@@ -16,7 +16,8 @@ export type AstExprNode = AstExprSeqNode |
 
 export type AstExprSeqNode = { nodeType: "exprSeq", exprs: AstExprNode[], ty?: Type };
 
-export type AstFuncNode = { nodeType: "func", args: AstFuncArgNode[], body: AstExprSeqNode, envId: number, bodyTy?: Type, rootTableSize?: number, closureId?: number, ty?: Type, rootIdx?: number };
+// NOTE: bodyTy はコードで指定なしの時にユニット型になることに注意する
+export type AstFuncNode = { nodeType: "func", args: AstFuncArgNode[], body: AstExprSeqNode, envId: number, bodyTy: Type, rootTableSize?: number, closureId?: number, ty?: Type, rootIdx?: number };
 export type AstFuncArgNode = { nodeType: "funcArg", name: string, ty?: Type };
 
 export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number, rootIdx?: number, rootIndices?: number[] };
