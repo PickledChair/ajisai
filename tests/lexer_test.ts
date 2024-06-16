@@ -117,3 +117,18 @@ func main() -> () {
     assertEquals(token, { tokenType, value });
   }
 });
+
+Deno.test("lexing val statement test", () => {
+  const src = "val answer: i32 = 42;";
+  const lexer = new Lexer(src);
+
+  const typeAndValues: [TokenType, string][] = [
+    ["val", "val"], ["identifier", "answer"], [":", ":"], ["identifier", "i32"],
+    ["=", "="], ["integer", "42"], [";", ";"]
+  ];
+
+  for (const [tokenType, value] of typeAndValues) {
+    const token = lexer.nextToken();
+    assertEquals(token, { tokenType, value });
+  }
+});

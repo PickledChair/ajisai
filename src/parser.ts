@@ -17,6 +17,7 @@ import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
   #lexer: Lexer;
+  #isTopLevel: boolean = true;
 
   constructor(lexer: Lexer) {
     this.#lexer = lexer;
@@ -25,7 +26,9 @@ export class Parser {
   parse(): AstModuleNode {
     const defs = [];
     while (!this.eat("eof")) {
-      if (this.eat("func")) {
+      if (this.eat("val")) {
+        defs.push(this.parseValDef());
+      } else if (this.eat("func")) {
         defs.push(this.parseFuncDef());
       } else {
         throw new Error("invalid definition");
@@ -35,32 +38,22 @@ export class Parser {
     return { nodeType: "module", defs };
   }
 
+  private parseValDef(): AstDefNode {
+    const declare = this.parseDeclare();
+    this.expect(";");
+    return { nodeType: "def", declare }
+  }
+
   private parseFuncDef(): AstDefNode {
     const name = this.expect("identifier");
-    this.expect("(");
-    const args = [];
-    if (!this.eat(")")) {
-      while (true) {
-        args.push(this.parseFuncArg());
-        if (!this.eat(",")) break;
-      }
-      this.expect(")");
-    }
-    const argTypes = args.map(arg => arg.ty!);
-
-    let bodyType: Type = { tyKind: "primitive", name: "()" };
-    if (this.eat("->")) {
-      bodyType = this.parseType();
-    }
-
-    this.expect("{");
-    const body = this.parseExprSeq();
-
+    const funcNode = this.parseFunc();
+    const argTypes = funcNode.args.map(arg => arg.ty!);
+    const bodyType = funcNode.bodyTy;
     const declare: AstDeclareNode = {
       nodeType: "declare",
       name: name.value,
-      value: { nodeType: "func", args, body, envId: -1 },
-      ty: { tyKind: "func", funcKind: "userdef", argTypes, bodyType }
+      value: funcNode,
+      ty: { tyKind: "func", funcKind: this.#isTopLevel ? "userdef" : "closure", argTypes, bodyType }
     };
     return { nodeType: "def", declare };
   }
@@ -88,7 +81,7 @@ export class Parser {
           bodyType = this.parseType();
         }
 
-        return { tyKind: "func", funcKind: "closure", argTypes, bodyType };
+        return { tyKind: "func", funcKind: this.#isTopLevel ? "userdef" : "closure", argTypes, bodyType };
       }
 
       const tyName = this.expect("identifier").value;
@@ -104,6 +97,9 @@ export class Parser {
 
   private parseFuncArg(): AstFuncArgNode {
     const name = this.expect("identifier");
+    // TODO: モジュールレベルの関数定義では引数の型注釈が必須だが、
+    //       型推論実装後はローカルでの関数定義では引数の型注釈を
+    //       省略できるようにする
     this.expect(":");
     const ty = this.parseType();
     return { nodeType: "funcArg", name: name.value, ty };
@@ -152,11 +148,16 @@ export class Parser {
   private parseDeclare(): AstDeclareNode {
     const variable = this.eat("identifier");
     if (variable) {
+      let ty: Type | undefined = undefined;
+      if (this.eat(":")) {
+        ty = this.parseType();
+      }
       this.expect("=");
       const body = this.parseExpr();
       return {
         nodeType: "declare",
         name: variable.value,
+        ty,
         value: body
       };
     }
@@ -164,6 +165,10 @@ export class Parser {
   }
 
   private parseFunc(): AstFuncNode {
+    const oldLevel = this.#isTopLevel;
+    this.#isTopLevel = false;
+
+    this.expect("(");
     const args = [];
 
     if (!this.eat(")")) {
@@ -181,6 +186,8 @@ export class Parser {
 
     this.expect("{");
     const body = this.parseExprSeq();
+
+    this.#isTopLevel = oldLevel;
 
     return { nodeType: "func", args, body, envId: -1, bodyTy };
   }
@@ -407,7 +414,6 @@ export class Parser {
 
     token = this.eat("func");
     if (token) {
-      this.expect("(");
       expr = this.parseFunc();
     }
 
