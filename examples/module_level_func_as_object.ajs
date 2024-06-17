@@ -4,9 +4,9 @@ func test_userdef(n: i32) {
 
 func main() {
     let
-        one = println_i32,
-        two = test_userdef,
-        three = func(n: i32) { println_i32(n * 3) }
+        val one = println_i32
+        val two = test_userdef
+        val three = func(n: i32) { println_i32(n * 3) }
     {
         one(10);
         two(10);

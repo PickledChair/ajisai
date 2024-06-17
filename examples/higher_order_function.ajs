@@ -12,10 +12,10 @@ func div_func(a: i32, b: i32) -> i32 {
 
 func main() {
     let
-        a   = 10,
-        b   = 5,
-        add = func(a: i32, b: i32) -> i32 { a + b },
-        mul = func(a: i32, b: i32) -> i32 { a * b }
+        val a = 10
+        val b = 5
+        func add(a: i32, b: i32) -> i32 { a + b }
+        func mul(a: i32, b: i32) -> i32 { a * b }
     {
         print_func_result(a, b, add);
         print_func_result(a, b, get_sub_func());

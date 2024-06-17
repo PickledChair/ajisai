@@ -1,5 +1,5 @@
 func main() {
-    let concat = func(a: str, b: str) -> str { str_concat(a, b) }
+    let func concat(a: str, b: str) -> str { str_concat(a, b) }
     {
         println_str(concat("Hello, ", "world!"))
     }

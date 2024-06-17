@@ -4,12 +4,12 @@ func add(a: i32, b: i32) -> i32 {
 
 func main() {
     let
-        a =
-            let a = 1, b = 2 {
+        val a =
+            let val a = 1, val b = 2 {
                 a + b
-            },
-        b =
-            let a = 3, b = 4 {
+            }
+        val b =
+            let val a = 3, val b = 4 {
                 a + b
             }
     {
