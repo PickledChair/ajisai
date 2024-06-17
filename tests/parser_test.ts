@@ -105,7 +105,7 @@ Deno.test("parsing grouped binary node test", () => {
 });
 
 Deno.test("parsing let expression test", () => {
-  const lexer = new Lexer("let a = 1, b = 2 { a + b }");
+  const lexer = new Lexer("let val a = 1, val b = 2 { a + b }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -384,7 +384,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
 });
 
 Deno.test("parsing func expression test", () => {
-  const lexer = new Lexer("let add = func(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
+  const lexer = new Lexer("let val add = func(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -438,7 +438,7 @@ Deno.test("parsing func expression test", () => {
 });
 
 Deno.test("parsing func expression (without arguments) test", () => {
-  const lexer = new Lexer("let hello = func() { println_str(\"Hello, world!\") } { hello() }");
+  const lexer = new Lexer("let val hello = func() { println_str(\"Hello, world!\") } { hello() }");
   const parser = new Parser(lexer);
   const ast = parser.parseExpr();
 
@@ -581,6 +581,84 @@ Deno.test("parsing empty main func (as val definition) test", () => {
           }
         }
       ]
+    }
+  );
+});
+
+Deno.test("parsing let func declare test", () => {
+  const lexer = new Lexer(`
+let val hello = "hello "
+    val world = "world!"
+    func display() { println_str(str_concat(hello, world)) }
+{ display() }
+`);
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "let",
+      declares: [
+        {
+          nodeType: "declare",
+          name: "hello",
+          ty: undefined,
+          value: { nodeType: "string", value: '"hello "', len: 0 }
+        },
+        {
+          nodeType: "declare",
+          name: "world",
+          ty: undefined,
+          value: { nodeType: "string", value: '"world!"', len: 0 }
+        },
+        {
+          nodeType: "declare",
+          name: "display",
+          ty: {
+            tyKind: "func",
+            funcKind: "closure",
+            argTypes: [],
+            bodyType: { tyKind: "primitive", name: "()" }
+          },
+          value: {
+            nodeType: "func",
+            args: [],
+            body: {
+              nodeType: "exprSeq",
+              exprs: [
+                {
+                  nodeType: "call",
+                  callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+                  args: [
+                    {
+                      nodeType: "call",
+                      callee: { nodeType: "variable", name: "str_concat", level: -1, fromEnv: -1, toEnv: -1 },
+                      args: [
+                        { nodeType: "variable", name: "hello", level: -1, fromEnv: -1, toEnv: -1 },
+                        { nodeType: "variable", name: "world", level: -1, fromEnv: -1, toEnv: -1 }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            envId: -1,
+            bodyTy: { tyKind: "primitive", name: "()" }
+          }
+        },
+      ],
+      body: {
+        nodeType: "exprSeq",
+        exprs: [
+          {
+            nodeType: "call",
+            callee: { nodeType: "variable", name: "display", level: -1, fromEnv: -1, toEnv: -1 },
+            args: []
+          }
+        ]
+      },
+      envId: -1
     }
   );
 });

@@ -1,10 +1,10 @@
 func main() {
     println_i32(
-        let a = 3,
-            b = if a == 2 { 2 } else { 5 }
+        let val a = 3
+            val b = if a == 2 { 2 } else { 5 }
         {
             if a != 1 {
-                let c = b { c }
+                let val c = b { c }
             } else {
                 42
             }

@@ -39,22 +39,13 @@ export class Parser {
   }
 
   private parseValDef(): AstDefNode {
-    const declare = this.parseDeclare();
+    const declare = this.parseValDeclare();
     this.expect(";");
     return { nodeType: "def", declare }
   }
 
   private parseFuncDef(): AstDefNode {
-    const name = this.expect("identifier");
-    const funcNode = this.parseFunc();
-    const argTypes = funcNode.args.map(arg => arg.ty!);
-    const bodyType = funcNode.bodyTy;
-    const declare: AstDeclareNode = {
-      nodeType: "declare",
-      name: name.value,
-      value: funcNode,
-      ty: { tyKind: "func", funcKind: this.#isTopLevel ? "userdef" : "closure", argTypes, bodyType }
-    };
+    const declare = this.parseFuncDeclare();
     return { nodeType: "def", declare };
   }
 
@@ -132,20 +123,34 @@ export class Parser {
   }
 
   private parseLet(): AstLetNode {
+    const oldLevel = this.#isTopLevel;
+    this.#isTopLevel = false;
+
     const declares = [];
     if (!this.eat("{")) {
       while (true) {
-        declares.push(this.parseDeclare());
-        if (!this.eat(",")) break;
+        if (this.eat("val")) {
+          declares.push(this.parseValDeclare());
+          this.eat(",");
+          continue;
+        }
+        if (this.eat("func")) {
+          declares.push(this.parseFuncDeclare());
+          this.eat(",");
+          continue;
+        }
+        break;
       }
       this.expect("{");
     }
     const body = this.parseExprSeq();
 
+    this.#isTopLevel = oldLevel;
+
     return { nodeType: "let", declares, body, envId: -1 };
   }
 
-  private parseDeclare(): AstDeclareNode {
+  private parseValDeclare(): AstDeclareNode {
     const variable = this.eat("identifier");
     if (variable) {
       let ty: Type | undefined = undefined;
@@ -162,6 +167,19 @@ export class Parser {
       };
     }
     throw new Error("Could not parse declaration");
+  }
+
+  private parseFuncDeclare(): AstDeclareNode {
+    const name = this.expect("identifier");
+    const funcNode = this.parseFunc();
+    const argTypes = funcNode.args.map(arg => arg.ty!);
+    const bodyType = funcNode.bodyTy;
+    return {
+      nodeType: "declare",
+      name: name.value,
+      value: funcNode,
+      ty: { tyKind: "func", funcKind: this.#isTopLevel ? "userdef" : "closure", argTypes, bodyType }
+    };
   }
 
   private parseFunc(): AstFuncNode {

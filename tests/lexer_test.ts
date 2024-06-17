@@ -63,13 +63,13 @@ Deno.test("skip whitespaces test", () => {
 });
 
 Deno.test("lexing let expression test", () => {
-  const src = "let a = 1, b = 2 { println_i32(a + b) }"
+  const src = "let val a = 1, val b = 2 { println_i32(a + b) }"
   const lexer = new Lexer(src);
 
   const typeAndValues: [TokenType, string][] = [
     ["let", "let"],
-    ["identifier", "a"], ["=", "="], ["integer", "1"], [",", ","],
-    ["identifier", "b"], ["=", "="], ["integer", "2"],
+    ["val", "val"], ["identifier", "a"], ["=", "="], ["integer", "1"], [",", ","],
+    ["val", "val"], ["identifier", "b"], ["=", "="], ["integer", "2"],
     ["{", "{"],
     ["identifier", "println_i32"], ["(", "("], ["identifier", "a"], ["+", "+"], ["identifier", "b"], [")", ")"],
     ["}", "}"]
