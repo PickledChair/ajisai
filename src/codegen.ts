@@ -46,6 +46,7 @@ export class CodeGenerator {
     let entry = undefined;
 
     for (const def of this.#module.defs) {
+      if (def.declare.nodeType === "moduleDeclare") throw new Error("not yet implemented");
       if (def.declare.ty!.tyKind === "func") {
         const funcCodeGen = new FuncCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstFuncNode);
         const [funcDecl, funcDef] = funcCodeGen.codegen(this.#defTypeMap);

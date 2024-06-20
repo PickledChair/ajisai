@@ -198,7 +198,7 @@ Deno.test("parsing 'else if' test", () => {
 Deno.test("parsing func definition test", () => {
   const lexer = new Lexer("func add(a: i32, b: i32) -> i32 { a + b }");
   const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const ast = parser.parse(false);
 
   assertEquals(
     ast,
@@ -278,7 +278,7 @@ Deno.test("parsing call expression test", () => {
 Deno.test("parsing empty main func test", () => {
   const lexer = new Lexer("func main() { () }");
   const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const ast = parser.parse(false);
 
   assertEquals(
     ast,
@@ -316,7 +316,7 @@ Deno.test("parsing empty main func test", () => {
 Deno.test("parsing func definition (with expression sequence) test", () => {
   const lexer = new Lexer("func add_with_display(a: i32, b: i32) -> i32 { println_i32(a + b); a + b }");
   const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const ast = parser.parse(false);
 
   assertEquals(
     ast,
@@ -517,7 +517,7 @@ Deno.test("parsing immediately invoked function test", () => {
 Deno.test("parsing val definition test", () => {
   const lexer = new Lexer("val a: i32 = 1 + 2;");
   const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const ast = parser.parse(false);
 
   assertEquals(
     ast,
@@ -550,7 +550,7 @@ Deno.test("parsing val definition test", () => {
 Deno.test("parsing empty main func (as val definition) test", () => {
   const lexer = new Lexer("val main: func() = func() { () };");
   const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const ast = parser.parse(false);
 
   assertEquals(
     ast,
@@ -659,6 +659,78 @@ let val hello = "hello "
         ]
       },
       envId: -1
+    }
+  );
+});
+
+Deno.test("parsing submodule test", () => {
+  const lexer = new Lexer(`
+module deep_thought {
+    val answer: i32 = 42;
+}
+`);
+  const parser = new Parser(lexer);
+  const ast = parser.parse(false);
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "module",
+      defs: [
+        {
+          nodeType: "def",
+          declare: {
+            nodeType: "moduleDeclare",
+            name: "deep_thought",
+            mod: {
+              nodeType: "module",
+              defs: [
+                {
+                  nodeType: "def",
+                  declare: {
+                    nodeType: "declare",
+                    name: "answer",
+                    ty: { tyKind: "primitive", name: "i32" },
+                    value: { nodeType: "integer", value: 42 }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  );
+});
+
+Deno.test("parsing module item access with path syntax test", () => {
+  const lexer = new Lexer("!a::b::c::d || false");
+  const parser = new Parser(lexer);
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "binary",
+      operator: "||",
+      left: {
+        nodeType: "unary",
+        operator: "!",
+        operand: {
+          nodeType: "path",
+          sup: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+          sub: {
+            nodeType: "path",
+            sup: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 },
+            sub: {
+              nodeType: "path",
+              sup: { nodeType: "variable", name: "c", level: -1, fromEnv: -1, toEnv: -1 },
+              sub: { nodeType: "variable", name: "d", level: -1, fromEnv: -1, toEnv: -1 }
+            }
+          }
+        }
+      },
+      right: { nodeType: "bool", value: false }
     }
   );
 });

@@ -11,7 +11,7 @@ if (import.meta.main) {
 
     const lexer = new Lexer(source);
     const parser = new Parser(lexer);
-    const ast = parser.parse();
+    const ast = parser.parse(false);
     const semAnalyzer = new SemanticAnalyzer(ast);
     const analyzedAst = semAnalyzer.analyze();
     const codeGen = new CodeGenerator(analyzedAst, semAnalyzer.defTypeMap);

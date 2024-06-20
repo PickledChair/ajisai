@@ -6,7 +6,9 @@ export type DefTypeMap = Map<string, Type>;
 
 const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   const defTypeMap = new Map();
-  for (const { declare: { name, ty } } of module.defs) {
+  for (const def of module.defs) {
+    if (def.declare.nodeType === "moduleDeclare") throw new Error("not yet implemented");
+    const { declare: { name, ty } } = def;
     if (ty) {
       defTypeMap.set(name, ty);
     } else {
@@ -151,6 +153,7 @@ export class SemanticAnalyzer {
   analyze(): AstModuleNode {
     const defs = this.#module.defs.map(def => this.analyzeDef(def));
     for (const def of this.#additional_defs) {
+      if (def.declare.nodeType === "moduleDeclare") throw new Error("not yet implemented");
       this.defTypeMap.set(def.declare.name, def.declare.ty!);
       defs.push(def);
     }
@@ -158,24 +161,28 @@ export class SemanticAnalyzer {
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
-    const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
-    if (ast.declare.ty) {
-      if (tyEqual(ast.declare.ty, exprTy)) {
-        return {
-          nodeType: "def",
-          declare: {
-            nodeType: "declare",
-            name: ast.declare.name,
-            ty: ast.declare.ty,
-            value: exprNode
-          }
-        };
+    if (ast.declare.nodeType === "declare") {
+      const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
+      if (ast.declare.ty) {
+        if (tyEqual(ast.declare.ty, exprTy)) {
+          return {
+            nodeType: "def",
+            declare: {
+              nodeType: "declare",
+              name: ast.declare.name,
+              ty: ast.declare.ty,
+              value: exprNode
+            }
+          };
+        } else {
+          throw new Error("invalid expr type");
+        }
       } else {
-        throw new Error("invalid expr type");
+        // moduleのトップレベルの定義は型注釈を必須にする
+        throw new Error("definition without type signature");
       }
     } else {
-      // moduleのトップレベルの定義は型注釈を必須にする
-      throw new Error("definition without type signature");
+      throw new Error("not yet implemented");
     }
   }
 
