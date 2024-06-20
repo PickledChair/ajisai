@@ -49,5 +49,9 @@ export type AstUnitNode = { nodeType: "unit" };
 export type AstIntegerNode = { nodeType: "integer", value: number };
 export type AstStringLitNode = { nodeType: "string", value: string, len: number };
 export type AstBoolNode = { nodeType: "bool", value: boolean };
-export type AstVariableNode = { nodeType: "variable", name: string, level: number, fromEnv: number, toEnv: number, ty?: Type };
-export type AstPathNode = { nodeType: "path", sup: AstVariableNode, sub: AstPathNode | AstVariableNode };
+
+export type AstVariableNode = AstLocalVarNode | AstGlobalVarNode;
+export type AstLocalVarNode = { nodeType: "localVar", name: string, fromEnv: number, toEnv: number, ty?: Type };
+export type AstGlobalVarNode = { nodeType: "globalVar", name: string, modName?: string, ty?: Type };
+
+export type AstPathNode = { nodeType: "path", sup: string, sub: AstPathNode | AstGlobalVarNode };

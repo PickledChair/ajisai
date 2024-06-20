@@ -19,7 +19,8 @@ import {
   AstModuleNode,
   AstFuncNode,
   AstUnaryNode,
-  AstVariableNode
+  AstLocalVarNode,
+  AstGlobalVarNode
 } from "./ast.ts";
 
 import { DefTypeMap } from "./semant.ts";
@@ -113,7 +114,8 @@ const getExprType = (expr: AstExprNode): Type | undefined => {
     case "bool": return { tyKind: "primitive", name: "bool" };
     case "integer": return { tyKind: "primitive", name: "i32" };
     case "string": return { tyKind: "primitive", name: "str" };
-    case "variable": return expr.ty;
+    case "localVar": return expr.ty;
+    case "globalVar": return expr.ty;
     case "unit": return { tyKind: "primitive", name: "()" };
   }
 };
@@ -208,8 +210,10 @@ class FuncCodeGenerator {
       }
       case "unit":
         return {};
-      case "variable":
-        return this.codegenVariable(ast, defTypeMap);
+      case "localVar":
+        return this.codegenLocalVar(ast);
+      case "globalVar":
+        return this.codegenGlobalVar(ast, defTypeMap);
       default:
         throw new Error(`invalid expr node: ${ast.nodeType}`);
     }
@@ -291,7 +295,7 @@ class FuncCodeGenerator {
       const { prelude: argPrelude, valInst } = this.codegenExpr(arg, defTypeMap);
       if (argPrelude) prelude = prelude.concat(argPrelude);
 
-      if (arg.nodeType === "variable" &&
+      if (arg.nodeType === "globalVar" &&
           arg.ty!.tyKind === "func" &&
           arg.ty!.funcKind !== "closure") {
         const closureId = this.#funcCtx.freshFuncTmpId;
@@ -337,27 +341,27 @@ class FuncCodeGenerator {
     }
   }
 
-  private codegenVariable(ast: AstVariableNode, defTypeMap: DefTypeMap): { valInst: ACPushValInst } {
-    if (ast.level === -1) {
-      const varTy = defTypeMap.get(ast.name);
-      if (varTy) {
-        if (varTy.tyKind === "func") {
-          if (varTy.funcKind === "userdef") {
-            return { valInst: { inst: "mod_defs.load", varName: ast.name } };
-          } else if (varTy.funcKind === "closure") {
-            return { valInst: { inst: "closure.load", id: ast.name} };
-          } else if (varTy.funcKind === "builtin") {
-            return { valInst: { inst: "builtin.load", varName: ast.name } };
-          }
-          throw new Error("unreachable");
-        } else {
-          throw new Error("unimplemented for non-func def load");
+  private codegenLocalVar(ast: AstLocalVarNode): { valInst: ACPushValInst } {
+    return { valInst: { inst: "env.load", envId: ast.toEnv, varName: ast.name } };
+  }
+
+  private codegenGlobalVar(ast: AstGlobalVarNode, defTypeMap: DefTypeMap): { valInst: ACPushValInst } {
+    const varTy = defTypeMap.get(ast.name);
+    if (varTy) {
+      if (varTy.tyKind === "func") {
+        if (varTy.funcKind === "userdef") {
+          return { valInst: { inst: "mod_defs.load", varName: ast.name } };
+        } else if (varTy.funcKind === "closure") {
+          return { valInst: { inst: "closure.load", id: ast.name} };
+        } else if (varTy.funcKind === "builtin") {
+          return { valInst: { inst: "builtin.load", varName: ast.name } };
         }
+        throw new Error("unreachable");
       } else {
-        throw new Error(`variable '${ast.name}' not found`);
+        throw new Error("unimplemented for non-func def load");
       }
     } else {
-      return { valInst: { inst: "env.load", envId: ast.toEnv, varName: ast.name } };
+      throw new Error(`variable '${ast.name}' not found`);
     }
   }
 
@@ -394,7 +398,7 @@ class FuncCodeGenerator {
       const { prelude: valPrelude, valInst } = this.codegenExpr(value, defTypeMap);
       if (valPrelude) prelude = prelude.concat(valPrelude);
 
-      if (value.nodeType === "variable" && value.ty!.tyKind === "func" && value.ty!.funcKind !== "closure") {
+      if (value.nodeType === "globalVar" && value.ty!.tyKind === "func" && value.ty!.funcKind !== "closure") {
         const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({

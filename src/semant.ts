@@ -162,6 +162,8 @@ export class SemanticAnalyzer {
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
     if (ast.declare.nodeType === "declare") {
+      // FIXME: モジュールレベルの変数の置き場は defTypeMap である
+      //        VarEnv("module") がただの番兵なのはミスリードに思える
       const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
       if (ast.declare.ty) {
         if (tyEqual(ast.declare.ty, exprTy)) {
@@ -222,17 +224,26 @@ export class SemanticAnalyzer {
       const [node, ty] = this.analyzeUnary(ast, varEnv);
       ast = node;
       astTy = ty;
-    } else if (ast.nodeType === "variable") {
-      const result = varEnv.getVarTyAndLevel(ast.name);
+    } else if (ast.nodeType === "localVar") {
+      const result = varEnv.getVarTy(ast.name);
       if (result) {
-        const { ty, level, envId } = result;
-        ast = { nodeType: "variable", name: ast.name, level, fromEnv: varEnv.envId, toEnv: envId, ty };
+        const { ty, envKind, envId } = result;
+        if (envKind === "module") {
+          // TODO: modName も指定する
+          ast = { nodeType: "globalVar", name: ast.name, ty };
+        } else {
+          if (envId === -1) throw new Error("invalid envId: -1");
+          ast = { nodeType: "localVar", name: ast.name, fromEnv: varEnv.envId, toEnv: envId, ty };
+        }
         astTy = ty;
       } else {
         const ty = this.defTypeMap.get(ast.name);
         if (ty) {
-          ast.ty = ty;
-          return [ast, ty];
+          return [
+            // TODO: modName も指定する
+            { nodeType: "globalVar", name: ast.name, ty },
+            ty
+          ];
         }
         throw new Error(`variable not found: ${ast.name}`);
       }
@@ -280,12 +291,12 @@ export class SemanticAnalyzer {
   private analyzeFunc(ast: AstFuncNode, varEnv: VarEnv): [AstFuncNode, FuncType] {
     for (const { name, ty } of ast.args) {
       if (ty) {
-        varEnv.setVarTy(name, ty);
+        varEnv.setNewVarTy(name, ty);
       } else {
         // TODO: ローカルに関数を定義できるようになったら、型シグネチャを必要としないので、簡易的な型推論が必要になる
         //       引数の型が指定されていない場合、dummyを設定しておく。ここではもうこれで良い
         //       あとで関数のbodyの解析中に決定させる必要がある
-        varEnv.setVarTy(name, { tyKind: "dummy" });
+        varEnv.setNewVarTy(name, { tyKind: "dummy" });
       }
     }
 
@@ -296,8 +307,10 @@ export class SemanticAnalyzer {
       if (ty) {
         return ty;
       } else {
-        const { ty: resolvedTy, level } = varEnv.getVarTyAndLevel(name)!;
-        if (level !== 0) {
+        const { ty: resolvedTy, envKind } = varEnv.getVarTy(name)!;
+        // FIXME: envKind だけでは現在の関数の引数であるかどうかがわからない
+        //        外側の関数からキャプチャされた変数である可能性がある
+        if (envKind !== "func") {
           throw new Error("not func arg");
         }
         return resolvedTy;
@@ -404,7 +417,7 @@ export class SemanticAnalyzer {
         throw new Error("mismatch type in declaration");
       }
     }
-    varEnv.setVarTy(name, exprTy);
+    varEnv.setNewVarTy(name, exprTy);
 
     return { nodeType: "declare", name, ty: exprTy, value: exprAst };
   }
@@ -461,7 +474,9 @@ export class SemanticAnalyzer {
       ast.ty = operandTy;
       return [ast, operandTy];
     }
-    if (operandTy.tyKind === "dummy" && operandAst.nodeType === "variable") {
+    if (operandTy.tyKind === "dummy"
+        && (operandAst.nodeType === "localVar"
+           || operandAst.nodeType === "globalVar")) {
       let ty: Type | undefined;
       if (ast.operator === "!") {
         ty = { tyKind: "primitive", name: "bool" };
@@ -470,7 +485,11 @@ export class SemanticAnalyzer {
         ty = { tyKind: "primitive", name: "i32" };
       }
       if (ty) {
-        varEnv.setVarTyWithLevel(operandAst.name, ty, operandAst.level);
+        // TODO: varEnv が level を扱わないように変更する
+        varEnv.setVarTy(
+          operandAst.name,
+          ty,
+        );
         ast.ty = ty;
         return [ast, ty];
       } else {

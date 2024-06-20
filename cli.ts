@@ -10,9 +10,10 @@ if (import.meta.main) {
     const source = await Deno.readTextFile(fileName);
 
     const lexer = new Lexer(source);
-    const parser = new Parser(lexer);
-    const ast = parser.parse(false);
-    const semAnalyzer = new SemanticAnalyzer(ast);
+    const parser = new Parser(lexer, fileName);
+    const ast = parser.parse();
+    console.log(ast.name);
+    const semAnalyzer = new SemanticAnalyzer(ast.mod);
     const analyzedAst = semAnalyzer.analyze();
     const codeGen = new CodeGenerator(analyzedAst, semAnalyzer.defTypeMap);
     const acir = codeGen.codegen();

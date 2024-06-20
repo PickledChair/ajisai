@@ -43,31 +43,35 @@ export class VarEnv {
     return this.#freshRootId;
   }
 
-  getVarTyAndLevel(name: string): { ty: Type, level: number, envId: number } | undefined {
+  getVarTy(name: string): { ty: Type, envKind: EnvKind, envId: number } | undefined {
     const ty_ = this.#variables.get(name);
     if (ty_) {
-      return { ty: ty_, level: 0, envId: this.envId };
+      return { ty: ty_, envKind: this.envKind, envId: this.envId };
     } else {
       if (this.parent_) {
-        const result = this.parent_.getVarTyAndLevel(name);
-        if (result) {
-          const { ty, level, envId } = result;
-          return { ty, level: level+1, envId };
-        }
+        return this.parent_.getVarTy(name);
       }
     }
     return undefined;
   }
 
-  setVarTy(name: string, ty: Type) {
+  setNewVarTy(name: string, ty: Type) {
     this.#variables.set(name, ty);
   }
 
-  setVarTyWithLevel(name: string, ty: Type, level: number) {
-    if (level === 0) {
-      this.setVarTy(name, ty);
+  setVarTy(name: string, ty: Type) {
+    if (this.#variables.get(name)) {
+      this.#variables.set(name, ty);
     } else {
-      this.parent_?.setVarTyWithLevel(name, ty, level-1);
+      this.parent_?.setVarTy(name, ty);
     }
   }
+
+  // setVarTyWithLevel(name: string, ty: Type, level: number) {
+  //   if (level === 0) {
+  //     this.setVarTy(name, ty);
+  //   } else {
+  //     this.parent_?.setVarTyWithLevel(name, ty, level-1);
+  //   }
+  // }
 }
