@@ -1,5 +1,12 @@
 import { parse } from "https://deno.land/std@0.204.0/flags/mod.ts";
-import { CodeGenerator, Lexer, Parser, SemanticAnalyzer, printCSrc } from "./mod.ts";
+import {
+  CodeGenerator,
+  Lexer,
+  Parser,
+  SemanticAnalyzer,
+  builtinDefTypeMap,
+  printCSrc
+} from "./mod.ts";
 
 if (import.meta.main) {
   const { _: [fileName_,], ...otherOptions } = parse(Deno.args);
@@ -12,9 +19,9 @@ if (import.meta.main) {
     const lexer = new Lexer(source);
     const parser = new Parser(lexer, fileName);
     const ast = parser.parse();
-    const semAnalyzer = new SemanticAnalyzer(ast);
+    const semAnalyzer = new SemanticAnalyzer(ast, builtinDefTypeMap());
     const analyzedAst = semAnalyzer.analyze();
-    const codeGen = new CodeGenerator(analyzedAst, semAnalyzer.defTypeMap);
+    const codeGen = new CodeGenerator(analyzedAst);
     const acir = codeGen.codegen();
 
     const optionCSourcePath_ = otherOptions["S"];
