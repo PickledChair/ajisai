@@ -19,10 +19,10 @@ import {
   AstModuleNode,
   AstFuncNode,
   AstUnaryNode,
-  AstVariableNode
+  AstLocalVarNode,
+  AstGlobalVarNode
 } from "./ast.ts";
 
-import { DefTypeMap } from "./semant.ts";
 import {
   PrimitiveType,
   FuncType,
@@ -33,22 +33,33 @@ import {
 
 export class CodeGenerator {
   #module: AstModuleNode;
-  #defTypeMap: DefTypeMap;
 
-  constructor(module: AstModuleNode, defTypeMap: DefTypeMap) {
+  constructor(module: AstModuleNode) {
     this.#module = module;
-    this.#defTypeMap = defTypeMap;
   }
 
   codegen(): ACModuleInst {
-    const funcDecls = [];
-    const funcDefs = [];
+    let funcDecls: ACDeclInst[] = [];
+    let funcDefs: ACDefInst[] = [];
     let entry = undefined;
 
     for (const def of this.#module.defs) {
-      if (def.declare.ty!.tyKind === "func") {
-        const funcCodeGen = new FuncCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstFuncNode);
-        const [funcDecl, funcDef] = funcCodeGen.codegen(this.#defTypeMap);
+      if (def.declare.nodeType === "moduleDeclare") {
+        const codeGen = new CodeGenerator(def.declare.mod);
+        const { funcDecls: subFuncDecls, funcDefs: subFuncDefs } = codeGen.codegen();
+        funcDecls = subFuncDecls.concat(funcDecls);
+        funcDefs = subFuncDefs.concat(funcDefs);
+        continue;
+      }
+      if (def.declare.value.nodeType === "func") {
+        if (def.declare.ty?.tyKind !== "func") throw new Error("unreachable");
+        const funcCodeGen = new FuncCodeGenerator(
+          def.declare.name,
+          def.declare.ty!,
+          def.declare.value as AstFuncNode,
+          def.declare.modName!
+        );
+        const [funcDecl, funcDef] = funcCodeGen.codegen();
         if (funcDecl) funcDecls.push(funcDecl);
         if (funcDef.inst === "func.def" || funcDef.inst === "closure.def") {
           funcDefs.push(funcDef);
@@ -112,7 +123,8 @@ const getExprType = (expr: AstExprNode): Type | undefined => {
     case "bool": return { tyKind: "primitive", name: "bool" };
     case "integer": return { tyKind: "primitive", name: "i32" };
     case "string": return { tyKind: "primitive", name: "str" };
-    case "variable": return expr.ty;
+    case "localVar": return expr.ty;
+    case "globalVar": return expr.ty;
     case "unit": return { tyKind: "primitive", name: "()" };
   }
 };
@@ -121,14 +133,16 @@ class FuncCodeGenerator {
   #funcTy: FuncType;
   #funcNode: AstFuncNode;
   #funcCtx: FuncContext;
+  #modName: string;
 
-  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode) {
+  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode, modName: string) {
     this.#funcTy = funcTy;
     this.#funcNode = func;
     this.#funcCtx = new FuncContext(funcName, func.envId);
+    this.#modName = modName;
   }
 
-  codegen(defTypeMap: DefTypeMap): [ACDeclInst | undefined, ACDefInst | ACEntryInst] {
+  codegen(): [ACDeclInst | undefined, ACDefInst | ACEntryInst] {
     const funcDeclInst = this.makeFuncDeclInst();
 
     let bodyInsts: ACFuncBodyInst[]  = [];
@@ -137,7 +151,7 @@ class FuncCodeGenerator {
     }
     bodyInsts.push({ inst: "func_frame.init", rootTableSize: this.#funcNode.rootTableSize! });
 
-    const { prelude, valInst } = this.codegenExprSeq(this.#funcNode.body, defTypeMap);
+    const { prelude, valInst } = this.codegenExprSeq(this.#funcNode.body);
 
     if (prelude) {
       bodyInsts = bodyInsts.concat(prelude);
@@ -164,6 +178,7 @@ class FuncCodeGenerator {
           funcName: funcDeclInst.funcName,
           args: funcDeclInst.args,
           resultType: funcDeclInst.resultType,
+          modName: this.#modName,
           envId: this.#funcCtx.funcEnvId,
           body: bodyInsts
         }
@@ -176,24 +191,25 @@ class FuncCodeGenerator {
       inst: this.#funcNode.closureId == null ? "func.decl" : "closure.decl",
       funcName: this.#funcCtx.funcName,
       args: this.#funcNode.args.map(arg => [arg.name, arg.ty!]),
-      resultType: this.#funcTy.bodyType
+      resultType: this.#funcTy.bodyType,
+      modName: this.#modName
     };
   }
 
-  private codegenExpr(ast: AstExprNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
+  private codegenExpr(ast: AstExprNode): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
     switch (ast.nodeType) {
       case "func":
         return this.codegenClosure(ast);
       case "unary":
-        return this.codegenUnary(ast, defTypeMap);
+        return this.codegenUnary(ast);
       case "binary":
-        return this.codegenBinary(ast, defTypeMap);
+        return this.codegenBinary(ast);
       case "call":
-        return this.codegenCall(ast, defTypeMap);
+        return this.codegenCall(ast);
       case "let":
-        return this.codegenLet(ast, defTypeMap);
+        return this.codegenLet(ast);
       case "if":
-        return this.codegenIf(ast, defTypeMap);
+        return this.codegenIf(ast);
       case "integer":
         return { valInst: { inst: "i32.const", value: ast.value } };
       case "bool":
@@ -207,15 +223,17 @@ class FuncCodeGenerator {
       }
       case "unit":
         return {};
-      case "variable":
-        return this.codegenVariable(ast, defTypeMap);
+      case "localVar":
+        return this.codegenLocalVar(ast);
+      case "globalVar":
+        return this.codegenGlobalVar(ast);
       default:
         throw new Error(`invalid expr node: ${ast.nodeType}`);
     }
   }
 
-  private codegenUnary(ast: AstUnaryNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
-    const { prelude: opePrelude, valInst: opeValInst } = this.codegenExpr(ast.operand, defTypeMap);
+  private codegenUnary(ast: AstUnaryNode): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
+    const { prelude: opePrelude, valInst: opeValInst } = this.codegenExpr(ast.operand);
     if (opeValInst) {
       if (ast.operator === "-") {
         return { prelude: opePrelude, valInst: { inst: "i32.neg", operand: opeValInst } };
@@ -227,9 +245,9 @@ class FuncCodeGenerator {
     throw new Error("invalid unary node");
   }
 
-  private codegenBinary(ast: AstBinaryNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
-    const { prelude: leftPrelude, valInst: leftValInst } = this.codegenExpr(ast.left, defTypeMap);
-    const { prelude: rightPrelude, valInst: rightValInst } = this.codegenExpr(ast.right, defTypeMap);
+  private codegenBinary(ast: AstBinaryNode): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
+    const { prelude: leftPrelude, valInst: leftValInst } = this.codegenExpr(ast.left);
+    const { prelude: rightPrelude, valInst: rightValInst } = this.codegenExpr(ast.right);
 
     let prelude: ACFuncBodyInst[] | undefined = undefined;
     if (leftPrelude || rightPrelude) {
@@ -279,24 +297,28 @@ class FuncCodeGenerator {
     throw new Error("unimplemented for other type");
   }
 
-  private codegenCall(ast: AstCallNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
+  private codegenCall(ast: AstCallNode): { prelude?: ACFuncBodyInst[], valInst: ACPushValInst } {
     let prelude: ACFuncBodyInst[] = [];
-    const { prelude: calleePrelude, valInst: calleeValInst } = this.codegenExpr(ast.callee, defTypeMap);
+    const { prelude: calleePrelude, valInst: calleeValInst } = this.codegenExpr(ast.callee);
 
     if (calleePrelude) prelude = prelude.concat(calleePrelude);
     const args: ACPushValInst[] = [];
 
     for (const arg of ast.args) {
-      const { prelude: argPrelude, valInst } = this.codegenExpr(arg, defTypeMap);
+      const { prelude: argPrelude, valInst } = this.codegenExpr(arg);
       if (argPrelude) prelude = prelude.concat(argPrelude);
 
-      if (arg.nodeType === "variable" &&
+      if (arg.nodeType === "globalVar" &&
           arg.ty!.tyKind === "func" &&
           arg.ty!.funcKind !== "closure") {
         const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({
-          inst: "closure.make_static", id: closureId, funcKind: arg.ty!.funcKind, name: arg.name
+          inst: "closure.make_static",
+          id: closureId,
+          funcKind: arg.ty!.funcKind,
+          name: arg.name,
+          modName: arg.ty!.funcKind === "builtin" ? undefined : this.#modName
         });
 
         args.push({ inst: "closure.const", id: closureId });
@@ -336,36 +358,36 @@ class FuncCodeGenerator {
     }
   }
 
-  private codegenVariable(ast: AstVariableNode, defTypeMap: DefTypeMap): { valInst: ACPushValInst } {
-    if (ast.level === -1) {
-      const varTy = defTypeMap.get(ast.name);
-      if (varTy) {
-        if (varTy.tyKind === "func") {
-          if (varTy.funcKind === "userdef") {
-            return { valInst: { inst: "mod_defs.load", varName: ast.name } };
-          } else if (varTy.funcKind === "closure") {
-            return { valInst: { inst: "closure.load", id: ast.name} };
-          } else if (varTy.funcKind === "builtin") {
-            return { valInst: { inst: "builtin.load", varName: ast.name } };
-          }
-          throw new Error("unreachable");
-        } else {
-          throw new Error("unimplemented for non-func def load");
+  private codegenLocalVar(ast: AstLocalVarNode): { valInst: ACPushValInst } {
+    return { valInst: { inst: "env.load", envId: ast.toEnv, varName: ast.name } };
+  }
+
+  private codegenGlobalVar(ast: AstGlobalVarNode): { valInst: ACPushValInst } {
+    const varTy = ast.ty;
+    if (varTy) {
+      if (varTy.tyKind === "func") {
+        if (varTy.funcKind === "userdef") {
+          return { valInst: { inst: "mod_defs.load", varName: ast.name, modName: ast.modName! } };
+        } else if (varTy.funcKind === "closure") {
+          return { valInst: { inst: "closure.load", id: ast.name} };
+        } else if (varTy.funcKind === "builtin") {
+          return { valInst: { inst: "builtin.load", varName: ast.name } };
         }
+        throw new Error("unreachable");
       } else {
-        throw new Error(`variable '${ast.name}' not found`);
+        throw new Error("unimplemented for non-func def load");
       }
     } else {
-      return { valInst: { inst: "env.load", envId: ast.toEnv, varName: ast.name } };
+      throw new Error("unreachable");
     }
   }
 
-  private codegenExprSeq(ast: AstExprSeqNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
+  private codegenExprSeq(ast: AstExprSeqNode): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
     let prelude: ACFuncBodyInst[] = [];
     let valInst: ACPushValInst | undefined = undefined;
 
     ast.exprs.forEach((expr, idx) => {
-      const { prelude: exprPrelude, valInst: exprValInst } = this.codegenExpr(expr, defTypeMap);
+      const { prelude: exprPrelude, valInst: exprValInst } = this.codegenExpr(expr);
       if (exprPrelude) prelude = prelude.concat(exprPrelude);
 
       if (idx === ast.exprs.length - 1) {
@@ -378,7 +400,7 @@ class FuncCodeGenerator {
     return { prelude: prelude.length === 0 ? undefined : prelude, valInst };
   }
 
-  private codegenLet(ast: AstLetNode, defTypeMap: DefTypeMap): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
+  private codegenLet(ast: AstLetNode): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {
     let prelude: ACFuncBodyInst[] = [];
 
     this.#funcCtx.enterScope(ast.envId);
@@ -390,14 +412,18 @@ class FuncCodeGenerator {
     }
 
     for (const { name, value, ty } of ast.declares) {
-      const { prelude: valPrelude, valInst } = this.codegenExpr(value, defTypeMap);
+      const { prelude: valPrelude, valInst } = this.codegenExpr(value);
       if (valPrelude) prelude = prelude.concat(valPrelude);
 
-      if (value.nodeType === "variable" && value.ty!.tyKind === "func" && value.ty!.funcKind !== "closure") {
+      if (value.nodeType === "globalVar" && value.ty!.tyKind === "func" && value.ty!.funcKind !== "closure") {
         const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({
-          inst: "closure.make_static", id: closureId, funcKind: value.ty!.funcKind, name: value.name
+          inst: "closure.make_static",
+          id: closureId,
+          funcKind: value.ty!.funcKind,
+          name: value.name,
+          modName: value.ty!.funcKind === "builtin" ? undefined : this.#modName
         });
 
         prelude.push(
@@ -411,7 +437,7 @@ class FuncCodeGenerator {
       // unit value は変数として定義しない
     }
 
-    const { prelude: bodyPrelude, valInst: valInst_ } = this.codegenExprSeq(ast.body, defTypeMap);
+    const { prelude: bodyPrelude, valInst: valInst_ } = this.codegenExprSeq(ast.body);
     if (bodyPrelude) prelude = prelude.concat(bodyPrelude);
 
     let valInst: ACPushValInst | undefined;
@@ -444,7 +470,7 @@ class FuncCodeGenerator {
     }
   }
 
-  private codegenIf(ast: AstIfNode, defTypeMap: DefTypeMap): { prelude: ACFuncBodyInst[], valInst?: ACPushValInst } {
+  private codegenIf(ast: AstIfNode): { prelude: ACFuncBodyInst[], valInst?: ACPushValInst } {
     let prelude: ACFuncBodyInst[] = [];
     const resultTmpId = this.#funcCtx.freshFuncTmpId;
     const isUnitType = tyEqual(ast.ty!, { tyKind: "primitive", name: "()" });
@@ -455,15 +481,15 @@ class FuncCodeGenerator {
       );
     }
 
-    const { prelude: condPrelude, valInst: condValInst } = this.codegenExpr(ast.cond, defTypeMap);
+    const { prelude: condPrelude, valInst: condValInst } = this.codegenExpr(ast.cond);
     if (condPrelude) prelude = prelude.concat(condPrelude);
 
     let thenInsts: ACFuncBodyInst[] = [];
-    const { prelude: thenPrelude, valInst: thenValInst } = this.codegenExprSeq(ast.then, defTypeMap);
+    const { prelude: thenPrelude, valInst: thenValInst } = this.codegenExprSeq(ast.then);
     if (thenPrelude) thenInsts = thenInsts.concat(thenPrelude);
 
     let elseInsts: ACFuncBodyInst[] = [];
-    const { prelude: elsePrelude, valInst: elseValInst } = this.codegenExprSeq(ast.else, defTypeMap);
+    const { prelude: elsePrelude, valInst: elseValInst } = this.codegenExprSeq(ast.else);
     if (elsePrelude) elseInsts = elseInsts.concat(elsePrelude);
 
     if (isUnitType) {

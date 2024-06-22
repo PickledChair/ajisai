@@ -12,9 +12,13 @@ export type ACDefInst = ACFuncDefInst | ACClosureDefInst;
 
 export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
 
-export type ACFuncDeclInst = { inst: "func.decl", funcName: string, args: [string, Type][], resultType: Type };
+export type ACFuncDeclInst = {
+  inst: "func.decl", funcName: string, args: [string, Type][], resultType: Type,
+  modName: string
+};
 export type ACFuncDefInst = {
   inst: "func.def", funcName: string, args: [string, Type][], resultType: Type,
+  modName: string,
   envId: number,
   body: ACFuncBodyInst[]
 };
@@ -37,7 +41,7 @@ export type ACFuncBodyInst =
 
 export type ACEnvDefVarInst = { inst: "env.defvar", envId: number, varName: string, ty: Type, value: ACPushValInst };
 export type ACEnvLoadInst = { inst: "env.load", envId: number, varName: string };
-export type ACModDefsLoadInst = { inst: "mod_defs.load", varName: string };
+export type ACModDefsLoadInst = { inst: "mod_defs.load", modName: string, varName: string };
 export type ACBuiltinLoadInst = { inst: "builtin.load", varName: string };
 export type ACClosureLoadInst = { inst: "closure.load", id: string };
 
@@ -99,6 +103,6 @@ export type ACBoolOrInst = { inst: "bool.or", left: ACPushValInst, right: ACPush
 export type ACStrMakeStaticInst = { inst: "str.make_static", id: number, value: string, len: number };
 export type ACStrConstInst = { inst: "str.const", id: number };
 
-export type ACClosureMakeStaticInst = { inst: "closure.make_static", id: number, funcKind: FuncKind, name: string };
+export type ACClosureMakeStaticInst = { inst: "closure.make_static", id: number, funcKind: FuncKind, name: string, modName?: string };
 export type ACClosureConstInst = { inst: "closure.const", id: number };
 export type ACClosureMakeInst = { inst: "closure.make", id: number };

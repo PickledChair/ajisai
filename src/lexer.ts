@@ -73,6 +73,10 @@ export class Lexer {
       case ",":
         return { tokenType: ",", value: "," };
       case ":":
+        if (this.peekChar() === ":") {
+          this.nextChar();
+          return { tokenType: "::", value: "::" };
+        }
         return { tokenType: ":", value: ":" };
       case ";":
         return { tokenType: ";", value: ";" };

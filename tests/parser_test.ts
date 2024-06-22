@@ -4,7 +4,7 @@ import { Parser } from "../src/parser.ts";
 
 Deno.test("parsing integer node test", () => {
   const lexer = new Lexer("42");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(ast, { nodeType: "integer", value: 42 });
@@ -12,14 +12,14 @@ Deno.test("parsing integer node test", () => {
 
 Deno.test("parsing string node test", () => {
   const lexer = new Lexer('println_str("Hello, world!")');
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
     ast,
     {
       nodeType: "call",
-      callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+      callee: { nodeType: "localVar", name: "println_str", fromEnv: -1, toEnv: -1 },
       args: [
         { nodeType: "string", value: '"Hello, world!"', len: 0 }
       ]
@@ -29,7 +29,7 @@ Deno.test("parsing string node test", () => {
 
 Deno.test("parsing simple binary node test", () => {
   const lexer = new Lexer("1 + 2");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -44,7 +44,7 @@ Deno.test("parsing simple binary node test", () => {
 
 Deno.test("parsing nested binary node test", () => {
   const lexer = new Lexer("2 * 3 + 4 - 5 / 6 % 7");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -75,7 +75,7 @@ Deno.test("parsing nested binary node test", () => {
 
 Deno.test("parsing grouped binary node test", () => {
   const lexer = new Lexer("2 * (3 + 4) - 5 / (6 % 7)");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -106,7 +106,7 @@ Deno.test("parsing grouped binary node test", () => {
 
 Deno.test("parsing let expression test", () => {
   const lexer = new Lexer("let val a = 1, val b = 2 { a + b }");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -132,8 +132,8 @@ Deno.test("parsing let expression test", () => {
         exprs: [
           {
             nodeType: "binary", operator: "+",
-            left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-            right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+            left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
+            right: { nodeType: "localVar", name: "b", fromEnv: -1, toEnv: -1 }
           }
         ]
       },
@@ -144,7 +144,7 @@ Deno.test("parsing let expression test", () => {
 
 Deno.test("parsing if expression test", () => {
   const lexer = new Lexer("if a == 0 { 42 } else { a }");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -153,18 +153,18 @@ Deno.test("parsing if expression test", () => {
       nodeType: "if",
       cond: {
         nodeType: "binary", operator: "==",
-        left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+        left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
         right: { nodeType: "integer", value: 0 }
       },
       then: { nodeType: "exprSeq", exprs: [{ nodeType: "integer", value: 42 }] },
-      else: { nodeType: "exprSeq", exprs: [{ nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 }] }
+      else: { nodeType: "exprSeq", exprs: [{ nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 }] }
     }
   );
 });
 
 Deno.test("parsing 'else if' test", () => {
   const lexer = new Lexer("if a == 0 { 42 } else if a == 1 { -1 } else { a }");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -173,7 +173,7 @@ Deno.test("parsing 'else if' test", () => {
       nodeType: "if",
       cond: {
         nodeType: "binary", operator: "==",
-        left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+        left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
         right: { nodeType: "integer", value: 0 }
       },
       then: { nodeType: "exprSeq", exprs: [{ nodeType: "integer", value: 42 }] },
@@ -183,11 +183,11 @@ Deno.test("parsing 'else if' test", () => {
             nodeType: "if",
             cond: {
               nodeType: "binary", operator: "==",
-              left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
+              left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
               right: { nodeType: "integer", value: 1 }
             },
             then: { nodeType: "exprSeq", exprs: [{ nodeType: "unary", operator: "-", operand: { nodeType: "integer", value: 1 } }] },
-            else: { nodeType: "exprSeq", exprs: [{ nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 }] }
+            else: { nodeType: "exprSeq", exprs: [{ nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 }] }
           }
         ]
       }
@@ -197,8 +197,8 @@ Deno.test("parsing 'else if' test", () => {
 
 Deno.test("parsing func definition test", () => {
   const lexer = new Lexer("func add(a: i32, b: i32) -> i32 { a + b }");
-  const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
 
   assertEquals(
     ast,
@@ -239,8 +239,8 @@ Deno.test("parsing func definition test", () => {
                 exprs: [
                   {
                     nodeType: "binary", operator: "+",
-                    left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-                    right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                    left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
+                    right: { nodeType: "localVar", name: "b", fromEnv: -1, toEnv: -1 }
                   }
                 ]
               },
@@ -256,14 +256,14 @@ Deno.test("parsing func definition test", () => {
 
 Deno.test("parsing call expression test", () => {
   const lexer = new Lexer("println_i32(1 + 2)");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
     ast,
     {
       nodeType: "call",
-      callee: { nodeType: "variable", name: "println_i32", level: -1, fromEnv: -1, toEnv: -1 },
+      callee: { nodeType: "localVar", name: "println_i32", fromEnv: -1, toEnv: -1 },
       args: [
         {
           nodeType: "binary", operator: "+",
@@ -277,8 +277,8 @@ Deno.test("parsing call expression test", () => {
 
 Deno.test("parsing empty main func test", () => {
   const lexer = new Lexer("func main() { () }");
-  const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
 
   assertEquals(
     ast,
@@ -315,8 +315,8 @@ Deno.test("parsing empty main func test", () => {
 
 Deno.test("parsing func definition (with expression sequence) test", () => {
   const lexer = new Lexer("func add_with_display(a: i32, b: i32) -> i32 { println_i32(a + b); a + b }");
-  const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
 
   assertEquals(
     ast,
@@ -357,19 +357,19 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
                 exprs: [
                   {
                     nodeType: "call",
-                    callee: { nodeType: "variable", name: "println_i32", level: -1, fromEnv: -1, toEnv: -1 },
+                    callee: { nodeType: "localVar", name: "println_i32", fromEnv: -1, toEnv: -1 },
                     args: [
                       {
                         nodeType: "binary", operator: "+",
-                        left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-                        right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                        left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
+                        right: { nodeType: "localVar", name: "b", fromEnv: -1, toEnv: -1 }
                       }
                     ]
                   },
                   {
                     nodeType: "binary", operator: "+",
-                    left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-                    right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                    left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
+                    right: { nodeType: "localVar", name: "b", fromEnv: -1, toEnv: -1 }
                   }
                 ]
               },
@@ -385,7 +385,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
 
 Deno.test("parsing func expression test", () => {
   const lexer = new Lexer("let val add = func(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -409,8 +409,8 @@ Deno.test("parsing func expression test", () => {
                 {
                   nodeType: "binary",
                   operator: "+",
-                  left: { nodeType: "variable", name: "a", level: -1, fromEnv: -1, toEnv: -1 },
-                  right: { nodeType: "variable", name: "b", level: -1, fromEnv: -1, toEnv: -1 }
+                  left: { nodeType: "localVar", name: "a", fromEnv: -1, toEnv: -1 },
+                  right: { nodeType: "localVar", name: "b", fromEnv: -1, toEnv: -1 }
                 }
               ]
             },
@@ -424,7 +424,7 @@ Deno.test("parsing func expression test", () => {
         exprs: [
           {
             nodeType: "call",
-            callee: { nodeType: "variable", name: "add", level: -1, fromEnv: -1, toEnv: -1 },
+            callee: { nodeType: "localVar", name: "add", fromEnv: -1, toEnv: -1 },
             args: [
               { nodeType: "integer", value: 1 },
               { nodeType: "integer", value: 2 }
@@ -439,7 +439,7 @@ Deno.test("parsing func expression test", () => {
 
 Deno.test("parsing func expression (without arguments) test", () => {
   const lexer = new Lexer("let val hello = func() { println_str(\"Hello, world!\") } { hello() }");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -459,7 +459,7 @@ Deno.test("parsing func expression (without arguments) test", () => {
               exprs: [
                 {
                   nodeType: "call",
-                  callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+                  callee: { nodeType: "localVar", name: "println_str", fromEnv: -1, toEnv: -1 },
                   args: [{ nodeType: "string", value: '"Hello, world!"', len: 0 }]
                 }
               ]
@@ -474,7 +474,7 @@ Deno.test("parsing func expression (without arguments) test", () => {
         exprs: [
           {
             nodeType: "call",
-            callee: { nodeType: "variable", name: "hello", level: -1, fromEnv: -1, toEnv: -1 },
+            callee: { nodeType: "localVar", name: "hello", fromEnv: -1, toEnv: -1 },
             args: []
           }
         ]
@@ -486,7 +486,7 @@ Deno.test("parsing func expression (without arguments) test", () => {
 
 Deno.test("parsing immediately invoked function test", () => {
   const lexer = new Lexer("func() { println_str(\"Hello, world!\") }()");
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -501,7 +501,7 @@ Deno.test("parsing immediately invoked function test", () => {
           exprs: [
             {
               nodeType: "call",
-              callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+              callee: { nodeType: "localVar", name: "println_str", fromEnv: -1, toEnv: -1 },
               args: [{ nodeType: "string", value: '"Hello, world!"', len: 0 }]
             }
           ]
@@ -516,8 +516,8 @@ Deno.test("parsing immediately invoked function test", () => {
 
 Deno.test("parsing val definition test", () => {
   const lexer = new Lexer("val a: i32 = 1 + 2;");
-  const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
 
   assertEquals(
     ast,
@@ -549,8 +549,8 @@ Deno.test("parsing val definition test", () => {
 
 Deno.test("parsing empty main func (as val definition) test", () => {
   const lexer = new Lexer("val main: func() = func() { () };");
-  const parser = new Parser(lexer);
-  const ast = parser.parse();
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
 
   assertEquals(
     ast,
@@ -592,7 +592,7 @@ let val hello = "hello "
     func display() { println_str(str_concat(hello, world)) }
 { display() }
 `);
-  const parser = new Parser(lexer);
+  const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
   assertEquals(
@@ -629,14 +629,14 @@ let val hello = "hello "
               exprs: [
                 {
                   nodeType: "call",
-                  callee: { nodeType: "variable", name: "println_str", level: -1, fromEnv: -1, toEnv: -1 },
+                  callee: { nodeType: "localVar", name: "println_str", fromEnv: -1, toEnv: -1 },
                   args: [
                     {
                       nodeType: "call",
-                      callee: { nodeType: "variable", name: "str_concat", level: -1, fromEnv: -1, toEnv: -1 },
+                      callee: { nodeType: "localVar", name: "str_concat", fromEnv: -1, toEnv: -1 },
                       args: [
-                        { nodeType: "variable", name: "hello", level: -1, fromEnv: -1, toEnv: -1 },
-                        { nodeType: "variable", name: "world", level: -1, fromEnv: -1, toEnv: -1 }
+                        { nodeType: "localVar", name: "hello", fromEnv: -1, toEnv: -1 },
+                        { nodeType: "localVar", name: "world", fromEnv: -1, toEnv: -1 }
                       ]
                     }
                   ]
@@ -653,12 +653,84 @@ let val hello = "hello "
         exprs: [
           {
             nodeType: "call",
-            callee: { nodeType: "variable", name: "display", level: -1, fromEnv: -1, toEnv: -1 },
+            callee: { nodeType: "localVar", name: "display", fromEnv: -1, toEnv: -1 },
             args: []
           }
         ]
       },
       envId: -1
+    }
+  );
+});
+
+Deno.test("parsing submodule test", () => {
+  const lexer = new Lexer(`
+module deep_thought {
+    val answer: i32 = 42;
+}
+`);
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "module",
+      defs: [
+        {
+          nodeType: "def",
+          declare: {
+            nodeType: "moduleDeclare",
+            name: "deep_thought",
+            mod: {
+              nodeType: "module",
+              defs: [
+                {
+                  nodeType: "def",
+                  declare: {
+                    nodeType: "declare",
+                    name: "answer",
+                    ty: { tyKind: "primitive", name: "i32" },
+                    value: { nodeType: "integer", value: 42 }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  );
+});
+
+Deno.test("parsing module item access with path syntax test", () => {
+  const lexer = new Lexer("!a::b::c::d || false");
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parseExpr();
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "binary",
+      operator: "||",
+      left: {
+        nodeType: "unary",
+        operator: "!",
+        operand: {
+          nodeType: "path",
+          sup: "a",
+          sub: {
+            nodeType: "path",
+            sup: "b",
+            sub: {
+              nodeType: "path",
+              sup:"c",
+              sub: { nodeType: "globalVar", name: "d" }
+            }
+          }
+        }
+      },
+      right: { nodeType: "bool", value: false }
     }
   );
 });

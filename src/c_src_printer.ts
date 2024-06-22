@@ -40,7 +40,7 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 };
 
 const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, decl: ACDeclInst) => {
-  let line = `${toCType(decl.resultType)} ${decl.inst === "func.decl" ? "userdef" : "closure"}_${decl.funcName}(AjisaiFuncFrame *parent_frame`;
+  let line = `${toCType(decl.resultType)} ${decl.inst === "func.decl" ? `userdef__${decl.modName}_` : "closure"}_${decl.funcName}(AjisaiFuncFrame *parent_frame`;
 
   for (const [argName, argTy] of decl.args) {
     line += `, ${toCType(argTy)} ${argName}`;
@@ -67,7 +67,7 @@ const printEntry = async (writer: WritableStreamDefaultWriter, encoder: TextEnco
 };
 
 const printFuncDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, def: ACDefInst) => {
-  let headLine = `${toCType(def.resultType)} ${def.inst === "func.def" ? "userdef" : "closure"}_${def.funcName}(AjisaiFuncFrame *parent_frame`;
+  let headLine = `${toCType(def.resultType)} ${def.inst === "func.def" ? `userdef__${def.modName}_` : "closure"}_${def.funcName}(AjisaiFuncFrame *parent_frame`;
   for (const [argName, argTy] of def.args) {
     headLine += `, ${toCType(argTy)} env${def.envId}_var_${argName}`;
   }
@@ -127,7 +127,7 @@ const printFuncBodyInst = async (writer: WritableStreamDefaultWriter, encoder: T
       line = `  static AjisaiString static_str${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_STR }, .len = ${inst.len}, .value = ${inst.value} };\n  static_str${inst.id}.obj_header.type_info = ajisai_str_type_info();\n`;
       break;
     case "closure.make_static":
-      line = `  static AjisaiClosure static_closure${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_FUNC }, .func_ptr = ${inst.funcKind === "builtin" ? "ajisai" : "userdef"}_${inst.name} };\n  static_closure${inst.id}.obj_header.type_info = ajisai_func_type_info();\n`;
+      line = `  static AjisaiClosure static_closure${inst.id} = { .obj_header = { .tag = AJISAI_OBJ_FUNC }, .func_ptr = ${inst.funcKind === "builtin" ? "ajisai" : `userdef__${inst.modName}_`}_${inst.name} };\n  static_closure${inst.id}.obj_header.type_info = ajisai_func_type_info();\n`;
       break;
     default:
       break;
@@ -141,7 +141,7 @@ const makePushValLiteral = (inst: ACPushValInst): string => {
     case "builtin.load":
       return `ajisai_${inst.varName}`;
     case "mod_defs.load":
-      return `userdef_${inst.varName}`;
+      return `userdef__${inst.modName}__${inst.varName}`;
     case "closure.load":
       return `closure_obj_${inst.id}`;
     case "env.load":

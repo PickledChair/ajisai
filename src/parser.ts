@@ -11,25 +11,52 @@ import {
   AstModuleNode,
   AstFuncArgNode,
   AstFuncNode,
-  BinOpKind
+  BinOpKind,
+  AstGlobalVarNode,
+  AstPathNode,
+  AstModuleDeclareNode,
 } from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
 export class Parser {
   #lexer: Lexer;
+  #filename: string;
   #isTopLevel: boolean = true;
 
-  constructor(lexer: Lexer) {
+  constructor(lexer: Lexer, filename: string) {
     this.#lexer = lexer;
+    this.#filename = filename;
   }
 
-  parse(): AstModuleNode {
+  parse(): AstModuleDeclareNode {
+    const filename = this.#filename.split("/").at(-1);
+    if (filename == null) throw new Error(`invalid filename: ${filename}`);
+    return {
+      nodeType: "moduleDeclare",
+      name: filename.slice(0, filename.indexOf(".")),
+      mod: this.parseModule(false),
+    };
+  }
+
+  private parseModule(isSubMod: boolean): AstModuleNode {
     const defs = [];
     while (!this.eat("eof")) {
       if (this.eat("val")) {
         defs.push(this.parseValDef());
       } else if (this.eat("func")) {
         defs.push(this.parseFuncDef());
+      } else if (this.eat("module")) {
+        const name = this.expect("identifier").value;
+        this.expect("{");
+        const mod = this.parseModule(true);
+        const def: AstDefNode = { nodeType: "def", declare: { nodeType: "moduleDeclare", name, mod } };
+        defs.push(def);
+      } else if (this.eat("}")) {
+        if (isSubMod) {
+          break;
+        } else {
+          throw new Error("invalid token '}'");
+        }
       } else {
         throw new Error("invalid definition");
       }
@@ -377,10 +404,10 @@ export class Parser {
 
   private parseUnary(): AstExprNode {
     if (this.eat("-")) {
-      const operand = this.parseExpr();
+      const operand = this.parsePrimary();
       return { nodeType: "unary", operator: "-", operand };
     } else if (this.eat("!")) {
-      const operand = this.parseExpr();
+      const operand = this.parsePrimary();
       return { nodeType: "unary", operator: "!", operand };
     } else {
       return this.parsePrimary();
@@ -417,7 +444,24 @@ export class Parser {
 
     token = this.eat("identifier");
     if (token) {
-      expr = { nodeType: "variable", name: token.value, level: -1, fromEnv: -1, toEnv: -1 };
+      expr = { nodeType: "localVar", name: token.value, fromEnv: -1, toEnv: -1 };
+      if (this.eat("::")) {
+        token = this.expect("identifier");
+        const sub: AstGlobalVarNode = { nodeType: "globalVar", name: token.value };
+        expr = { nodeType: "path", sup: expr.name, sub };
+        let cur = expr;
+        while (this.eat("::")) {
+          token = this.expect("identifier");
+          const sub: AstGlobalVarNode = { nodeType: "globalVar", name: token.value };
+          if (cur.sub.nodeType === "globalVar") {
+            const cur_sub: AstPathNode = { nodeType: "path", sup: cur.sub.name, sub }
+            cur.sub = cur_sub;
+            cur = cur_sub;
+          } else {
+            throw new Error("unreachable");
+          }
+        }
+      }
     }
 
     token = this.eat("let");

@@ -1,0 +1,18 @@
+module arith {
+    func add(a: i32, b: i32) -> i32 { a + b }
+    func sub(a: i32, b: i32) -> i32 { a - b }
+    func mul(a: i32, b: i32) -> i32 { a * b }
+    func div(a: i32, b: i32) -> i32 { a / b }
+
+    module deep_thought {
+        func answer() -> i32 { 42 }
+    }
+}
+
+func main() {
+    println_i32(arith::add(10, 5));
+    println_i32(arith::sub(10, 5));
+    println_i32(arith::mul(10, 5));
+    println_i32(arith::div(10, 5));
+    println_i32(arith::deep_thought::answer());
+}

@@ -132,3 +132,29 @@ Deno.test("lexing val statement test", () => {
     assertEquals(token, { tokenType, value });
   }
 });
+
+Deno.test("lexing module and symbol :: test", () => {
+  const src = `
+module deep_thought {
+  val answer: i32 = 42;
+}
+
+println_i32(deep_thought::answer);
+`;
+  const lexer = new Lexer(src);
+
+  const typeAndValues: [TokenType, string][] = [
+    ["module", "module"], ["identifier", "deep_thought"], ["{", "{"],
+    ["val", "val"], ["identifier", "answer"], [":", ":"], ["identifier", "i32"],
+    ["=", "="], ["integer", "42"], [";", ";"],
+    ["}", "}"],
+    ["identifier", "println_i32"], ["(", "("],
+    ["identifier", "deep_thought"], ["::", "::"], ["identifier", "answer"],
+    [")", ")"], [";", ";"]
+  ];
+
+  for (const [tokenType, value] of typeAndValues) {
+    const token = lexer.nextToken();
+    assertEquals(token, { tokenType, value });
+  }
+});

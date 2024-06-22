@@ -1,18 +1,26 @@
 import { VarEnv } from "./env.ts";
 import { Type, PrimitiveType, tyEqual, mayBeHeapObj, FuncType } from "./type.ts";
-import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstFuncNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
+import {
+  AstBinaryNode,
+  AstLetNode,
+  AstDeclareNode,
+  AstUnaryNode,
+  AstIfNode,
+  AstExprNode,
+  AstDefNode,
+  AstModuleNode,
+  AstFuncNode,
+  AstCallNode,
+  AstExprSeqNode,
+  AstModuleDeclareNode,
+  AstPathNode,
+  AstGlobalVarNode
+} from "./ast.ts";
 
 export type DefTypeMap = Map<string, Type>;
 
-const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
+export const builtinDefTypeMap = (): DefTypeMap => {
   const defTypeMap = new Map();
-  for (const { declare: { name, ty } } of module.defs) {
-    if (ty) {
-      defTypeMap.set(name, ty);
-    } else {
-      throw new Error(`type of definition '${name}' is unknown`);
-    }
-  }
   defTypeMap.set(
     "print_i32",
     {
@@ -137,20 +145,84 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   return defTypeMap;
 };
 
-export class SemanticAnalyzer {
-  #module: AstModuleNode;
-  #additional_defs: AstDefNode[] = [];
-  #clsId = 0;
-  defTypeMap: DefTypeMap;
+const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
+  const defTypeMap = new Map();
+  for (const def of module.defs) {
+    if (def.declare.nodeType === "moduleDeclare") continue;
+    const { declare: { name, ty } } = def;
+    if (ty) {
+      defTypeMap.set(name, ty);
+    } else {
+      throw new Error(`type of definition '${name}' is unknown`);
+    }
+  }
+  return defTypeMap;
+};
 
-  constructor(module: AstModuleNode) {
-    this.#module = module;
-    this.defTypeMap = makeDefTypeMap(module);
+class ModuleRenamer {
+  #prevModIdxs: Map<string, number> = new Map();
+
+  renameModule(name: string): string {
+    const idx = this.#prevModIdxs.get(name);
+    if (idx) {
+      const nextIdx = idx + 1;
+      this.#prevModIdxs.set(name, nextIdx);
+      return `${name}{nextIdx}`;
+    } else {
+      this.#prevModIdxs.set(name, 0);
+      return `${name}0`;
+    }
+  }
+}
+
+const getType = (name: string, defTypeMap: DefTypeMap, builtins?: DefTypeMap): Type | undefined => {
+  const ty = defTypeMap.get(name);
+  if (ty) {
+    return ty;
+  } else {
+    return builtins?.get(name);
+  }
+};
+
+export class SemanticAnalyzer {
+  #builtins: DefTypeMap;
+  #module: AstModuleNode;
+  #modRenamer: ModuleRenamer;
+  modName: { orig: string, renamed: string };
+  #additional_defs: AstDefNode[] = [];
+  clsId: number;
+  defTypeMap: DefTypeMap;
+  subModAnalyzers: Map<string, SemanticAnalyzer> = new Map();
+
+  constructor(
+    modDeclare: AstModuleDeclareNode,
+    builtinDefTypeMap: DefTypeMap,
+    modRenamer?: ModuleRenamer,
+    startClosureId?: number
+  ) {
+    this.#builtins = builtinDefTypeMap;
+    this.#module = modDeclare.mod;
+    if (modRenamer) {
+      this.#modRenamer = modRenamer;
+    } else {
+      this.#modRenamer = new ModuleRenamer();
+    }
+    if (startClosureId) {
+      this.clsId = startClosureId;
+    } else {
+      this.clsId = 0;
+    }
+    this.modName = {
+      orig: modDeclare.name,
+      renamed: this.#modRenamer.renameModule(modDeclare.name)
+    };
+    this.defTypeMap = makeDefTypeMap(modDeclare.mod);
   }
 
   analyze(): AstModuleNode {
     const defs = this.#module.defs.map(def => this.analyzeDef(def));
     for (const def of this.#additional_defs) {
+      if (def.declare.nodeType === "moduleDeclare") continue;
       this.defTypeMap.set(def.declare.name, def.declare.ty!);
       defs.push(def);
     }
@@ -158,25 +230,45 @@ export class SemanticAnalyzer {
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
-    const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
-    if (ast.declare.ty) {
-      if (tyEqual(ast.declare.ty, exprTy)) {
-        return {
-          nodeType: "def",
-          declare: {
-            nodeType: "declare",
-            name: ast.declare.name,
-            ty: ast.declare.ty,
-            value: exprNode
-          }
-        };
+    if (ast.declare.nodeType === "declare") {
+      // FIXME: モジュールレベルの変数の置き場は defTypeMap である
+      //        VarEnv("module") がただの番兵なのはミスリードに思える
+      const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, new VarEnv("module"));
+      if (ast.declare.ty) {
+        if (tyEqual(ast.declare.ty, exprTy)) {
+          return {
+            nodeType: "def",
+            declare: {
+              nodeType: "declare",
+              name: ast.declare.name,
+              ty: ast.declare.ty,
+              value: exprNode,
+              modName: this.modName.renamed
+            }
+          };
+        } else {
+          throw new Error("invalid expr type");
+        }
       } else {
-        throw new Error("invalid expr type");
+        // moduleのトップレベルの定義は型注釈を必須にする
+        throw new Error("definition without type signature");
       }
-    } else {
-      // moduleのトップレベルの定義は型注釈を必須にする
-      throw new Error("definition without type signature");
     }
+    if (ast.declare.nodeType === "moduleDeclare") {
+      const subModAnalyzer = new SemanticAnalyzer(ast.declare, this.#builtins, this.#modRenamer, this.clsId);
+      const mod = subModAnalyzer.analyze();
+      this.clsId = subModAnalyzer.clsId;
+      this.subModAnalyzers.set(subModAnalyzer.modName.orig, subModAnalyzer);
+      return {
+        nodeType: "def",
+        declare: {
+          nodeType: "moduleDeclare",
+          name: subModAnalyzer.modName.renamed,
+          mod
+        }
+      };
+    }
+    throw new Error("not yet implemented");
   }
 
   private analyzeExpr(ast: AstExprNode, varEnv: VarEnv): [AstExprNode, Type] {
@@ -215,20 +307,45 @@ export class SemanticAnalyzer {
       const [node, ty] = this.analyzeUnary(ast, varEnv);
       ast = node;
       astTy = ty;
-    } else if (ast.nodeType === "variable") {
-      const result = varEnv.getVarTyAndLevel(ast.name);
+    } else if (ast.nodeType === "localVar") {
+      const result = varEnv.getVarTy(ast.name);
       if (result) {
-        const { ty, level, envId } = result;
-        ast = { nodeType: "variable", name: ast.name, level, fromEnv: varEnv.envId, toEnv: envId, ty };
+        const { ty, envKind, envId } = result;
+        if (envKind === "module") {
+          throw new Error("unreachable");
+        } else {
+          if (envId === -1) throw new Error("invalid envId: -1");
+          ast = { nodeType: "localVar", name: ast.name, fromEnv: varEnv.envId, toEnv: envId, ty };
+        }
         astTy = ty;
       } else {
-        const ty = this.defTypeMap.get(ast.name);
+        const ty = getType(ast.name, this.defTypeMap, this.#builtins);
         if (ty) {
-          ast.ty = ty;
-          return [ast, ty];
+          return [
+            // TODO: modName も指定する
+            { nodeType: "globalVar", name: ast.name, ty, modName: this.modName.renamed },
+            ty
+          ];
         }
         throw new Error(`variable not found: ${ast.name}`);
       }
+    } else if (ast.nodeType === "path") {
+      let modName = ast.sup;
+      let mod: SemanticAnalyzer | undefined = this.subModAnalyzers.get(modName);
+      let node: AstPathNode | AstGlobalVarNode = ast.sub;
+      while (node.nodeType === "path") {
+        if (mod == null) throw new Error(`invalid module name: ${modName}`);
+        modName = node.sup;
+        mod = mod.subModAnalyzers.get(modName);
+        node = node.sub;
+      }
+      if (mod == null) throw new Error(`invalid module name: ${modName}`);
+      const ty = mod.defTypeMap.get(node.name);
+      if (ty == null) throw new Error(`variable '${node.name}' not found in module '${modName}'`);
+      astTy = ty;
+      node.ty = ty;
+      node.modName = mod.modName.renamed;
+      ast = node;
     } else if (ast.nodeType === "integer") {
       astTy = { tyKind: "primitive", name: "i32" } as PrimitiveType;
     } else if (ast.nodeType === "bool") {
@@ -267,18 +384,18 @@ export class SemanticAnalyzer {
   }
 
   private freshClsId(): number {
-    return this.#clsId++;
+    return this.clsId++;
   }
 
   private analyzeFunc(ast: AstFuncNode, varEnv: VarEnv): [AstFuncNode, FuncType] {
     for (const { name, ty } of ast.args) {
       if (ty) {
-        varEnv.setVarTy(name, ty);
+        varEnv.setNewVarTy(name, ty);
       } else {
         // TODO: ローカルに関数を定義できるようになったら、型シグネチャを必要としないので、簡易的な型推論が必要になる
         //       引数の型が指定されていない場合、dummyを設定しておく。ここではもうこれで良い
         //       あとで関数のbodyの解析中に決定させる必要がある
-        varEnv.setVarTy(name, { tyKind: "dummy" });
+        varEnv.setNewVarTy(name, { tyKind: "dummy" });
       }
     }
 
@@ -289,8 +406,10 @@ export class SemanticAnalyzer {
       if (ty) {
         return ty;
       } else {
-        const { ty: resolvedTy, level } = varEnv.getVarTyAndLevel(name)!;
-        if (level !== 0) {
+        const { ty: resolvedTy, envKind } = varEnv.getVarTy(name)!;
+        // FIXME: envKind だけでは現在の関数の引数であるかどうかがわからない
+        //        外側の関数からキャプチャされた変数である可能性がある
+        if (envKind !== "func") {
           throw new Error("not func arg");
         }
         return resolvedTy;
@@ -397,7 +516,7 @@ export class SemanticAnalyzer {
         throw new Error("mismatch type in declaration");
       }
     }
-    varEnv.setVarTy(name, exprTy);
+    varEnv.setNewVarTy(name, exprTy);
 
     return { nodeType: "declare", name, ty: exprTy, value: exprAst };
   }
@@ -454,7 +573,9 @@ export class SemanticAnalyzer {
       ast.ty = operandTy;
       return [ast, operandTy];
     }
-    if (operandTy.tyKind === "dummy" && operandAst.nodeType === "variable") {
+    if (operandTy.tyKind === "dummy"
+        && (operandAst.nodeType === "localVar"
+           || operandAst.nodeType === "globalVar")) {
       let ty: Type | undefined;
       if (ast.operator === "!") {
         ty = { tyKind: "primitive", name: "bool" };
@@ -463,7 +584,11 @@ export class SemanticAnalyzer {
         ty = { tyKind: "primitive", name: "i32" };
       }
       if (ty) {
-        varEnv.setVarTyWithLevel(operandAst.name, ty, operandAst.level);
+        // TODO: varEnv が level を扱わないように変更する
+        varEnv.setVarTy(
+          operandAst.name,
+          ty,
+        );
         ast.ty = ty;
         return [ast, ty];
       } else {
