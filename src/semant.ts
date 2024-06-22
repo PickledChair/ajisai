@@ -1,6 +1,6 @@
 import { VarEnv } from "./env.ts";
 import { Type, PrimitiveType, tyEqual, mayBeHeapObj, FuncType } from "./type.ts";
-import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstFuncNode, AstCallNode, AstExprSeqNode } from "./ast.ts";
+import { AstBinaryNode, AstLetNode, AstDeclareNode, AstUnaryNode, AstIfNode, AstExprNode, AstDefNode, AstModuleNode, AstFuncNode, AstCallNode, AstExprSeqNode, AstModuleDeclareNode } from "./ast.ts";
 
 export type DefTypeMap = Map<string, Type>;
 
@@ -139,15 +139,42 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   return defTypeMap;
 };
 
+class ModuleRenamer {
+  #prevModIdxs: Map<string, number> = new Map();
+
+  renameModule(name: string): string {
+    const idx = this.#prevModIdxs.get(name);
+    if (idx) {
+      const nextIdx = idx + 1;
+      this.#prevModIdxs.set(name, nextIdx);
+      return `${name}{nextIdx}`;
+    } else {
+      this.#prevModIdxs.set(name, 0);
+      return `${name}0`;
+    }
+  }
+}
+
 export class SemanticAnalyzer {
   #module: AstModuleNode;
+  #modRenamer: ModuleRenamer;
+  #modName: { orig: string, renamed: string };
   #additional_defs: AstDefNode[] = [];
   #clsId = 0;
   defTypeMap: DefTypeMap;
 
-  constructor(module: AstModuleNode) {
-    this.#module = module;
-    this.defTypeMap = makeDefTypeMap(module);
+  constructor(modDeclare: AstModuleDeclareNode, modRenamer?: ModuleRenamer) {
+    this.#module = modDeclare.mod;
+    if (modRenamer) {
+      this.#modRenamer = modRenamer;
+    } else {
+      this.#modRenamer = new ModuleRenamer();
+    }
+    this.#modName = {
+      orig: modDeclare.name,
+      renamed: this.#modRenamer.renameModule(modDeclare.name)
+    };
+    this.defTypeMap = makeDefTypeMap(modDeclare.mod);
   }
 
   analyze(): AstModuleNode {
@@ -173,7 +200,8 @@ export class SemanticAnalyzer {
               nodeType: "declare",
               name: ast.declare.name,
               ty: ast.declare.ty,
-              value: exprNode
+              value: exprNode,
+              modName: this.#modName.renamed
             }
           };
         } else {
@@ -229,8 +257,7 @@ export class SemanticAnalyzer {
       if (result) {
         const { ty, envKind, envId } = result;
         if (envKind === "module") {
-          // TODO: modName も指定する
-          ast = { nodeType: "globalVar", name: ast.name, ty };
+          ast = { nodeType: "globalVar", name: ast.name, ty, modName: this.#modName.renamed };
         } else {
           if (envId === -1) throw new Error("invalid envId: -1");
           ast = { nodeType: "localVar", name: ast.name, fromEnv: varEnv.envId, toEnv: envId, ty };

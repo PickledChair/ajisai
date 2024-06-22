@@ -48,8 +48,14 @@ export class CodeGenerator {
 
     for (const def of this.#module.defs) {
       if (def.declare.nodeType === "moduleDeclare") throw new Error("not yet implemented");
-      if (def.declare.ty!.tyKind === "func") {
-        const funcCodeGen = new FuncCodeGenerator(def.declare.name, def.declare.ty!, def.declare.value as AstFuncNode);
+      if (def.declare.value.nodeType === "func") {
+        if (def.declare.ty?.tyKind !== "func") throw new Error("unreachable");
+        const funcCodeGen = new FuncCodeGenerator(
+          def.declare.name,
+          def.declare.ty!,
+          def.declare.value as AstFuncNode,
+          def.declare.modName!
+        );
         const [funcDecl, funcDef] = funcCodeGen.codegen(this.#defTypeMap);
         if (funcDecl) funcDecls.push(funcDecl);
         if (funcDef.inst === "func.def" || funcDef.inst === "closure.def") {
@@ -124,11 +130,13 @@ class FuncCodeGenerator {
   #funcTy: FuncType;
   #funcNode: AstFuncNode;
   #funcCtx: FuncContext;
+  #modName: string;
 
-  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode) {
+  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode, modName: string) {
     this.#funcTy = funcTy;
     this.#funcNode = func;
     this.#funcCtx = new FuncContext(funcName, func.envId);
+    this.#modName = modName;
   }
 
   codegen(defTypeMap: DefTypeMap): [ACDeclInst | undefined, ACDefInst | ACEntryInst] {
@@ -167,6 +175,7 @@ class FuncCodeGenerator {
           funcName: funcDeclInst.funcName,
           args: funcDeclInst.args,
           resultType: funcDeclInst.resultType,
+          modName: this.#modName,
           envId: this.#funcCtx.funcEnvId,
           body: bodyInsts
         }
@@ -179,7 +188,8 @@ class FuncCodeGenerator {
       inst: this.#funcNode.closureId == null ? "func.decl" : "closure.decl",
       funcName: this.#funcCtx.funcName,
       args: this.#funcNode.args.map(arg => [arg.name, arg.ty!]),
-      resultType: this.#funcTy.bodyType
+      resultType: this.#funcTy.bodyType,
+      modName: this.#modName
     };
   }
 
@@ -301,7 +311,11 @@ class FuncCodeGenerator {
         const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({
-          inst: "closure.make_static", id: closureId, funcKind: arg.ty!.funcKind, name: arg.name
+          inst: "closure.make_static",
+          id: closureId,
+          funcKind: arg.ty!.funcKind,
+          name: arg.name,
+          modName: arg.ty!.funcKind === "builtin" ? undefined : this.#modName
         });
 
         args.push({ inst: "closure.const", id: closureId });
@@ -350,7 +364,7 @@ class FuncCodeGenerator {
     if (varTy) {
       if (varTy.tyKind === "func") {
         if (varTy.funcKind === "userdef") {
-          return { valInst: { inst: "mod_defs.load", varName: ast.name } };
+          return { valInst: { inst: "mod_defs.load", varName: ast.name, modName: this.#modName } };
         } else if (varTy.funcKind === "closure") {
           return { valInst: { inst: "closure.load", id: ast.name} };
         } else if (varTy.funcKind === "builtin") {
@@ -402,7 +416,11 @@ class FuncCodeGenerator {
         const closureId = this.#funcCtx.freshFuncTmpId;
 
         prelude.push({
-          inst: "closure.make_static", id: closureId, funcKind: value.ty!.funcKind, name: value.name
+          inst: "closure.make_static",
+          id: closureId,
+          funcKind: value.ty!.funcKind,
+          name: value.name,
+          modName: value.ty!.funcKind === "builtin" ? undefined : this.#modName
         });
 
         prelude.push(

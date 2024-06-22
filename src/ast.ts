@@ -33,7 +33,7 @@ export type AstFuncArgNode = { nodeType: "funcArg", name: string, ty?: Type };
 
 export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number, rootIdx?: number, rootIndices?: number[] };
 
-export type AstDeclareNode = { nodeType: "declare", name: string, ty?: Type, value: AstExprNode };
+export type AstDeclareNode = { nodeType: "declare", name: string, ty?: Type, value: AstExprNode, modName?: string };
 
 export type AstIfNode = { nodeType: "if", cond: AstExprNode, then: AstExprSeqNode, else: AstExprSeqNode, ty?: Type };
 
