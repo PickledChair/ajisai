@@ -164,13 +164,13 @@ class ModuleRenamer {
 
   renameModule(name: string): string {
     const idx = this.#prevModIdxs.get(name);
-    if (idx) {
-      const nextIdx = idx + 1;
-      this.#prevModIdxs.set(name, nextIdx);
-      return `${name}{nextIdx}`;
-    } else {
+    if (idx == null) {
       this.#prevModIdxs.set(name, 0);
       return `${name}0`;
+    } else  {
+      const nextIdx = idx + 1;
+      this.#prevModIdxs.set(name, nextIdx);
+      return `${name}${nextIdx}`;
     }
   }
 }
