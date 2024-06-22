@@ -66,12 +66,4 @@ export class VarEnv {
       this.parent_?.setVarTy(name, ty);
     }
   }
-
-  // setVarTyWithLevel(name: string, ty: Type, level: number) {
-  //   if (level === 0) {
-  //     this.setVarTy(name, ty);
-  //   } else {
-  //     this.parent_?.setVarTyWithLevel(name, ty, level-1);
-  //   }
-  // }
 }
