@@ -43,21 +43,22 @@ export class CodeGenerator {
     let funcDefs: ACDefInst[] = [];
     let entry = undefined;
 
-    for (const def of this.#module.defs) {
-      if (def.declare.nodeType === "moduleDeclare") {
-        const codeGen = new CodeGenerator(def.declare.mod);
+    for (const item of this.#module.items) {
+      if (item.nodeType === "import") throw new Error("TODO");
+      if (item.declare.nodeType === "moduleDeclare") {
+        const codeGen = new CodeGenerator(item.declare.mod);
         const { funcDecls: subFuncDecls, funcDefs: subFuncDefs } = codeGen.codegen();
         funcDecls = subFuncDecls.concat(funcDecls);
         funcDefs = subFuncDefs.concat(funcDefs);
         continue;
       }
-      if (def.declare.value.nodeType === "func") {
-        if (def.declare.ty?.tyKind !== "func") throw new Error("unreachable");
+      if (item.declare.value.nodeType === "func") {
+        if (item.declare.ty?.tyKind !== "func") throw new Error("unreachable");
         const funcCodeGen = new FuncCodeGenerator(
-          def.declare.name,
-          def.declare.ty!,
-          def.declare.value as AstFuncNode,
-          def.declare.modName!
+          item.declare.name,
+          item.declare.ty!,
+          item.declare.value as AstFuncNode,
+          item.declare.modName!
         );
         const [funcDecl, funcDef] = funcCodeGen.codegen();
         if (funcDecl) funcDecls.push(funcDecl);

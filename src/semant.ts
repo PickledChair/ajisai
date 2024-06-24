@@ -147,9 +147,10 @@ export const builtinDefTypeMap = (): DefTypeMap => {
 
 const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   const defTypeMap = new Map();
-  for (const def of module.defs) {
-    if (def.declare.nodeType === "moduleDeclare") continue;
-    const { declare: { name, ty } } = def;
+  for (const item of module.items) {
+    if (item.nodeType === "import") continue;
+    if (item.declare.nodeType === "moduleDeclare") continue;
+    const { declare: { name, ty } } = item;
     if (ty) {
       defTypeMap.set(name, ty);
     } else {
@@ -220,13 +221,17 @@ export class SemanticAnalyzer {
   }
 
   analyze(): AstModuleNode {
-    const defs = this.#module.defs.map(def => this.analyzeDef(def));
+    const defs = this.#module.items.filter(
+      item => item.nodeType === "def"
+    ).map(
+      def => this.analyzeDef(def as AstDefNode)
+    );
     for (const def of this.#additional_defs) {
       if (def.declare.nodeType === "moduleDeclare") continue;
       this.defTypeMap.set(def.declare.name, def.declare.ty!);
       defs.push(def);
     }
-    return { nodeType: "module", defs };
+    return { nodeType: "module", items: defs };
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
