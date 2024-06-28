@@ -15,6 +15,7 @@ import {
   AstGlobalVarNode,
   AstPathNode,
   AstModuleDeclareNode,
+  AstImportNode,
 } from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
@@ -39,30 +40,79 @@ export class Parser {
   }
 
   private parseModule(isSubMod: boolean): AstModuleNode {
-    const defs = [];
+    const items = [];
     while (!this.eat("eof")) {
       if (this.eat("val")) {
-        defs.push(this.parseValDef());
+        items.push(this.parseValDef());
       } else if (this.eat("func")) {
-        defs.push(this.parseFuncDef());
+        items.push(this.parseFuncDef());
       } else if (this.eat("module")) {
         const name = this.expect("identifier").value;
         this.expect("{");
         const mod = this.parseModule(true);
-        const def: AstDefNode = { nodeType: "def", declare: { nodeType: "moduleDeclare", name, mod } };
-        defs.push(def);
+        const def: AstDefNode = {
+          nodeType: "def",
+          declare: { nodeType: "moduleDeclare", name, mod }
+        };
+        items.push(def);
       } else if (this.eat("}")) {
         if (isSubMod) {
           break;
         } else {
           throw new Error("invalid token '}'");
         }
+      } else if (this.eat("import")) {
+        items.push(this.parseImport());
       } else {
         throw new Error("invalid definition");
       }
     }
 
-    return { nodeType: "module", defs };
+    return { nodeType: "module", items };
+  }
+
+  private parseImport(): AstImportNode {
+    const fst = this.expect("identifier");
+    let path: AstGlobalVarNode | AstPathNode = { nodeType: "globalVar", name: fst.value };
+    if (this.eat("::")) {
+      path = this.parsePath(path.name);
+    }
+    let asName: AstGlobalVarNode | undefined = undefined;
+    if (this.eat("as")) {
+      const asNameToken = this.expect("identifier");
+      asName = { nodeType: "globalVar", name: asNameToken.value };
+    }
+    this.expect(";");
+
+    const modName = (() => {
+      let p = path;
+      while (p.nodeType === "path") p = p.sub;
+      return p.name;
+    })();
+    if (modName === "super" || modName === "package") {
+      asName = { nodeType: "globalVar", name: modName };
+    }
+
+    return { nodeType: "import", path, asName };
+  }
+
+  private parsePath(firstName: string): AstPathNode {
+    const token = this.expect("identifier");
+    const sub: AstGlobalVarNode = { nodeType: "globalVar", name: token.value };
+    const expr: AstPathNode = { nodeType: "path", sup: firstName, sub };
+    let cur = expr;
+    while (this.eat("::")) {
+      const token = this.expect("identifier");
+      const sub: AstGlobalVarNode = { nodeType: "globalVar", name: token.value };
+      if (cur.sub.nodeType === "globalVar") {
+        const cur_sub: AstPathNode = { nodeType: "path", sup: cur.sub.name, sub }
+        cur.sub = cur_sub;
+        cur = cur_sub;
+      } else {
+        throw new Error("unreachable");
+      }
+    }
+    return expr;
   }
 
   private parseValDef(): AstDefNode {
@@ -416,66 +466,53 @@ export class Parser {
 
   private parsePrimary(): AstExprNode {
     let token;
+    let expr: AstExprNode | undefined = undefined;
 
     token = this.eat("true") ?? this.eat("false");
     if (token) {
-      return { nodeType: "bool", value: token.value == "true" };
+      expr = { nodeType: "bool", value: token.value == "true" };
     }
 
-    token = this.eat("string");
-    if (token) {
-      return { nodeType: "string", value: token.value, len: 0 };
+    if (expr == null) {
+      token = this.eat("string");
+      if (token) {
+        expr = { nodeType: "string", value: token.value, len: 0 };
+      }
     }
 
-    token = this.eat("integer");
-    if (token) {
-      return { nodeType: "integer", value: parseInt(token.value) };
+    if (expr == null) {
+      token = this.eat("integer");
+      if (token) {
+        expr = { nodeType: "integer", value: parseInt(token.value) };
+      }
     }
 
-    let expr: AstExprNode | undefined;
-
-    token = this.eat("(");
-    if (token) {
+    if (expr == null && this.eat("(")) {
       if (this.eat(")")) {
         return { nodeType: "unit" };
       }
       expr = this.parseGroup();
     }
 
-    token = this.eat("identifier");
-    if (token) {
-      expr = { nodeType: "localVar", name: token.value, fromEnv: -1, toEnv: -1 };
-      if (this.eat("::")) {
-        token = this.expect("identifier");
-        const sub: AstGlobalVarNode = { nodeType: "globalVar", name: token.value };
-        expr = { nodeType: "path", sup: expr.name, sub };
-        let cur = expr;
-        while (this.eat("::")) {
-          token = this.expect("identifier");
-          const sub: AstGlobalVarNode = { nodeType: "globalVar", name: token.value };
-          if (cur.sub.nodeType === "globalVar") {
-            const cur_sub: AstPathNode = { nodeType: "path", sup: cur.sub.name, sub }
-            cur.sub = cur_sub;
-            cur = cur_sub;
-          } else {
-            throw new Error("unreachable");
-          }
+    if (expr == null) {
+      token = this.eat("identifier");
+      if (token) {
+        expr = { nodeType: "localVar", name: token.value, fromEnv: -1, toEnv: -1 };
+        if (this.eat("::")) {
+          expr = this.parsePath(expr.name);
         }
       }
     }
 
-    token = this.eat("let");
-    if (token) {
+    if (expr == null && this.eat("let")) {
       expr = this.parseLet();
     }
 
-    token = this.eat("if");
-    if (token) {
+    if (expr == null && this.eat("if")) {
       expr = this.parseIf();
     }
 
-    token = this.eat("func");
-    if (token) {
+    if (expr == null && this.eat("func")) {
       expr = this.parseFunc();
     }
 

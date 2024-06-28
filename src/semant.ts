@@ -13,13 +13,12 @@ import {
   AstCallNode,
   AstExprSeqNode,
   AstModuleDeclareNode,
-  AstPathNode,
-  AstGlobalVarNode
 } from "./ast.ts";
+import { ImportGraphNode, makeImportGraph } from "./import_graph.ts";
 
 export type DefTypeMap = Map<string, Type>;
 
-export const builtinDefTypeMap = (): DefTypeMap => {
+const builtinDefTypeMap = (): DefTypeMap => {
   const defTypeMap = new Map();
   defTypeMap.set(
     "print_i32",
@@ -147,9 +146,10 @@ export const builtinDefTypeMap = (): DefTypeMap => {
 
 const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   const defTypeMap = new Map();
-  for (const def of module.defs) {
-    if (def.declare.nodeType === "moduleDeclare") continue;
-    const { declare: { name, ty } } = def;
+  for (const item of module.items) {
+    if (item.nodeType === "import") continue;
+    if (item.declare.nodeType === "moduleDeclare") continue;
+    const { declare: { name, ty } } = item;
     if (ty) {
       defTypeMap.set(name, ty);
     } else {
@@ -158,22 +158,6 @@ const makeDefTypeMap = (module: AstModuleNode): DefTypeMap => {
   }
   return defTypeMap;
 };
-
-class ModuleRenamer {
-  #prevModIdxs: Map<string, number> = new Map();
-
-  renameModule(name: string): string {
-    const idx = this.#prevModIdxs.get(name);
-    if (idx == null) {
-      this.#prevModIdxs.set(name, 0);
-      return `${name}0`;
-    } else  {
-      const nextIdx = idx + 1;
-      this.#prevModIdxs.set(name, nextIdx);
-      return `${name}${nextIdx}`;
-    }
-  }
-}
 
 const getType = (name: string, defTypeMap: DefTypeMap, builtins?: DefTypeMap): Type | undefined => {
   const ty = defTypeMap.get(name);
@@ -184,49 +168,55 @@ const getType = (name: string, defTypeMap: DefTypeMap, builtins?: DefTypeMap): T
   }
 };
 
-export class SemanticAnalyzer {
+class SemanticAnalyzer {
   #builtins: DefTypeMap;
-  #module: AstModuleNode;
-  #modRenamer: ModuleRenamer;
-  modName: { orig: string, renamed: string };
+  #importGraph: ImportGraphNode;
   #additional_defs: AstDefNode[] = [];
   clsId: number;
-  defTypeMap: DefTypeMap;
-  subModAnalyzers: Map<string, SemanticAnalyzer> = new Map();
+  #defTypeMap: DefTypeMap;
 
   constructor(
-    modDeclare: AstModuleDeclareNode,
+    importGraph: ImportGraphNode,
     builtinDefTypeMap: DefTypeMap,
-    modRenamer?: ModuleRenamer,
     startClosureId?: number
   ) {
     this.#builtins = builtinDefTypeMap;
-    this.#module = modDeclare.mod;
-    if (modRenamer) {
-      this.#modRenamer = modRenamer;
-    } else {
-      this.#modRenamer = new ModuleRenamer();
-    }
+    this.#importGraph = importGraph;
     if (startClosureId) {
       this.clsId = startClosureId;
     } else {
       this.clsId = 0;
     }
-    this.modName = {
-      orig: modDeclare.name,
-      renamed: this.#modRenamer.renameModule(modDeclare.name)
-    };
-    this.defTypeMap = makeDefTypeMap(modDeclare.mod);
+    this.#defTypeMap = makeDefTypeMap(importGraph.mod);
   }
 
-  analyze(): AstModuleNode {
-    const defs = this.#module.defs.map(def => this.analyzeDef(def));
+  analyze(): ImportGraphNode {
+    for (const [asName, importGraph] of this.#importGraph.importMods.entries()) {
+      if (!importGraph.isAnalyzed) {
+        const analyzer = new SemanticAnalyzer(importGraph, this.#builtins, this.clsId);
+        const analyzedGraph = analyzer.analyze();
+        this.clsId = analyzer.clsId;
+        this.#importGraph.importMods.set(asName, analyzedGraph);
+      }
+    }
+    const analyzedMod = this.analyzeModule(this.#importGraph.mod);
+    this.#importGraph.mod = analyzedMod;
+    this.#importGraph.isAnalyzed = true;
+    return this.#importGraph;
+  }
+
+  private analyzeModule(ast: AstModuleNode): AstModuleNode {
+    const defs = ast.items.filter(
+      item => item.nodeType === "def" && item.declare.nodeType !== "moduleDeclare"
+    ).map(
+      def => this.analyzeDef(def as AstDefNode)
+    );
     for (const def of this.#additional_defs) {
-      if (def.declare.nodeType === "moduleDeclare") continue;
-      this.defTypeMap.set(def.declare.name, def.declare.ty!);
+      if (def.declare.nodeType === "moduleDeclare") throw new Error("unreachable");
+      this.#defTypeMap.set(def.declare.name, def.declare.ty!);
       defs.push(def);
     }
-    return { nodeType: "module", defs };
+    return { nodeType: "module", items: defs };
   }
 
   private analyzeDef(ast: AstDefNode): AstDefNode {
@@ -243,7 +233,7 @@ export class SemanticAnalyzer {
               name: ast.declare.name,
               ty: ast.declare.ty,
               value: exprNode,
-              modName: this.modName.renamed
+              modName: this.#importGraph.modName.renamed
             }
           };
         } else {
@@ -255,18 +245,7 @@ export class SemanticAnalyzer {
       }
     }
     if (ast.declare.nodeType === "moduleDeclare") {
-      const subModAnalyzer = new SemanticAnalyzer(ast.declare, this.#builtins, this.#modRenamer, this.clsId);
-      const mod = subModAnalyzer.analyze();
-      this.clsId = subModAnalyzer.clsId;
-      this.subModAnalyzers.set(subModAnalyzer.modName.orig, subModAnalyzer);
-      return {
-        nodeType: "def",
-        declare: {
-          nodeType: "moduleDeclare",
-          name: subModAnalyzer.modName.renamed,
-          mod
-        }
-      };
+      throw new Error("unreachable");
     }
     throw new Error("not yet implemented");
   }
@@ -319,33 +298,39 @@ export class SemanticAnalyzer {
         }
         astTy = ty;
       } else {
-        const ty = getType(ast.name, this.defTypeMap, this.#builtins);
+        const ty = getType(ast.name, this.#defTypeMap, this.#builtins);
         if (ty) {
           return [
             // TODO: modName も指定する
-            { nodeType: "globalVar", name: ast.name, ty, modName: this.modName.renamed },
+            {
+              nodeType: "globalVar",
+              name: ast.name,
+              ty,
+              modName: this.#importGraph.modName.renamed
+            },
             ty
           ];
         }
         throw new Error(`variable not found: ${ast.name}`);
       }
     } else if (ast.nodeType === "path") {
-      let modName = ast.sup;
-      let mod: SemanticAnalyzer | undefined = this.subModAnalyzers.get(modName);
-      let node: AstPathNode | AstGlobalVarNode = ast.sub;
-      while (node.nodeType === "path") {
-        if (mod == null) throw new Error(`invalid module name: ${modName}`);
-        modName = node.sup;
-        mod = mod.subModAnalyzers.get(modName);
-        node = node.sub;
+      const modName = ast.sup;
+      const modGraph = this.#importGraph.importMods.get(modName);
+      if (modGraph == null) throw new Error(`invalid module name: ${modName}`);
+      if (ast.sub.nodeType === "path") {
+        throw new Error("cannot nested module access");
       }
-      if (mod == null) throw new Error(`invalid module name: ${modName}`);
-      const ty = mod.defTypeMap.get(node.name);
-      if (ty == null) throw new Error(`variable '${node.name}' not found in module '${modName}'`);
+      let ty: Type | undefined = undefined;
+      for (const item of modGraph.mod.items) {
+        if (item.nodeType === "def" && item.declare.nodeType !== "moduleDeclare") {
+          ty = item.declare.ty;
+        }
+      }
+      if (ty == null) throw new Error(`variable '${ast.sub.name}' not found in module '${modName}'`);
       astTy = ty;
-      node.ty = ty;
-      node.modName = mod.modName.renamed;
-      ast = node;
+      ast.sub.ty = ty;
+      ast.sub.modName = modGraph.modName.renamed;
+      ast = ast.sub;
     } else if (ast.nodeType === "integer") {
       astTy = { tyKind: "primitive", name: "i32" } as PrimitiveType;
     } else if (ast.nodeType === "bool") {
@@ -598,3 +583,9 @@ export class SemanticAnalyzer {
     throw new Error("invalid unary node type");
   }
 }
+
+export const semanticAnalyze = (modDeclare: AstModuleDeclareNode): ImportGraphNode => {
+  const importGraph = makeImportGraph(modDeclare);
+  const semAnalyzer = new SemanticAnalyzer(importGraph, builtinDefTypeMap());
+  return semAnalyzer.analyze();
+};

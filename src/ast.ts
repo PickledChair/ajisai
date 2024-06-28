@@ -2,11 +2,23 @@ import { Type } from "./type.ts";
 
 export type AstNodeType = AstNode["nodeType"];
 
-export type AstNode = AstModuleNode | AstDefNode | AstFuncArgNode | AstDeclareNode | AstExprNode;
+export type AstNode =
+  AstModuleNode
+  | AstModuleItemNode
+  | AstFuncArgNode
+  | AstDeclareNode
+  | AstExprNode;
 
-export type AstModuleNode = { nodeType: "module", defs: AstDefNode[] };
+export type AstModuleNode = { nodeType: "module", items: AstModuleItemNode[] };
+export type AstModuleItemNode = AstDefNode | AstImportNode;
 
 export type AstDefNode = { nodeType: "def", declare: AstDeclareNode | AstModuleDeclareNode };
+
+export type AstImportNode = {
+  nodeType: "import",
+  path: AstPathNode | AstGlobalVarNode,
+  asName?: AstGlobalVarNode
+};
 
 export type AstModuleDeclareNode = { nodeType: "moduleDeclare", name: string, mod: AstModuleNode };
 

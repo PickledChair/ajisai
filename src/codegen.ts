@@ -16,12 +16,12 @@ import {
   AstExprSeqNode,
   AstIfNode,
   AstLetNode,
-  AstModuleNode,
   AstFuncNode,
   AstUnaryNode,
   AstLocalVarNode,
   AstGlobalVarNode
 } from "./ast.ts";
+import { ImportGraphNode } from "./import_graph.ts";
 
 import {
   PrimitiveType,
@@ -32,10 +32,10 @@ import {
 } from "./type.ts";
 
 export class CodeGenerator {
-  #module: AstModuleNode;
+  #importGraph: ImportGraphNode;
 
-  constructor(module: AstModuleNode) {
-    this.#module = module;
+  constructor(importGraph: ImportGraphNode) {
+    this.#importGraph = importGraph;
   }
 
   codegen(): ACModuleInst {
@@ -43,21 +43,23 @@ export class CodeGenerator {
     let funcDefs: ACDefInst[] = [];
     let entry = undefined;
 
-    for (const def of this.#module.defs) {
-      if (def.declare.nodeType === "moduleDeclare") {
-        const codeGen = new CodeGenerator(def.declare.mod);
-        const { funcDecls: subFuncDecls, funcDefs: subFuncDefs } = codeGen.codegen();
-        funcDecls = subFuncDecls.concat(funcDecls);
-        funcDefs = subFuncDefs.concat(funcDefs);
-        continue;
-      }
-      if (def.declare.value.nodeType === "func") {
-        if (def.declare.ty?.tyKind !== "func") throw new Error("unreachable");
+    for (const subImportGraph of this.#importGraph.importMods.values()) {
+      const codeGen = new CodeGenerator(subImportGraph);
+      const { funcDecls: subFuncDecls, funcDefs: subFuncDefs } = codeGen.codegen();
+      funcDecls = subFuncDecls.concat(funcDecls);
+      funcDefs = subFuncDefs.concat(funcDefs);
+    }
+
+    for (const item of this.#importGraph.mod.items) {
+      if (item.nodeType === "import") continue;
+      if (item.declare.nodeType === "moduleDeclare") continue;
+      if (item.declare.value.nodeType === "func") {
+        if (item.declare.ty?.tyKind !== "func") throw new Error("unreachable");
         const funcCodeGen = new FuncCodeGenerator(
-          def.declare.name,
-          def.declare.ty!,
-          def.declare.value as AstFuncNode,
-          def.declare.modName!
+          item.declare.name,
+          item.declare.ty!,
+          item.declare.value as AstFuncNode,
+          item.declare.modName!
         );
         const [funcDecl, funcDef] = funcCodeGen.codegen();
         if (funcDecl) funcDecls.push(funcDecl);

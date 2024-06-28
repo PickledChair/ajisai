@@ -3,8 +3,7 @@ import {
   CodeGenerator,
   Lexer,
   Parser,
-  SemanticAnalyzer,
-  builtinDefTypeMap,
+  semanticAnalyze,
   printCSrc
 } from "./mod.ts";
 
@@ -19,8 +18,7 @@ if (import.meta.main) {
     const lexer = new Lexer(source);
     const parser = new Parser(lexer, fileName);
     const ast = parser.parse();
-    const semAnalyzer = new SemanticAnalyzer(ast, builtinDefTypeMap());
-    const analyzedAst = semAnalyzer.analyze();
+    const analyzedAst = semanticAnalyze(ast);
     const codeGen = new CodeGenerator(analyzedAst);
     const acir = codeGen.codegen();
 

@@ -1,0 +1,29 @@
+module a {
+    module b {
+        import super::c;
+
+        func hello() {
+            c::hello()
+        }
+    }
+
+    module c {
+        import package::d;
+
+        func hello() {
+            d::hello()
+        }
+    }
+}
+
+module d {
+    func hello() {
+        println_str("hello")
+    }
+}
+
+import a::b;
+
+func main() {
+    b::hello()
+}

@@ -204,7 +204,7 @@ Deno.test("parsing func definition test", () => {
     ast,
     {
       nodeType: "module",
-      defs: [
+      items: [
         {
           nodeType: "def",
           declare: {
@@ -284,7 +284,7 @@ Deno.test("parsing empty main func test", () => {
     ast,
     {
       nodeType: "module",
-      defs: [
+      items: [
         {
           nodeType: "def",
           declare: {
@@ -322,7 +322,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
     ast,
     {
       nodeType: "module",
-      defs: [
+      items: [
         {
           nodeType: "def",
           declare: {
@@ -523,7 +523,7 @@ Deno.test("parsing val definition test", () => {
     ast,
     {
       nodeType: "module",
-      defs: [
+      items: [
         {
           nodeType: "def",
           declare: {
@@ -556,7 +556,7 @@ Deno.test("parsing empty main func (as val definition) test", () => {
     ast,
     {
       nodeType: "module",
-      defs: [
+      items: [
         {
           nodeType: "def",
           declare: {
@@ -676,7 +676,7 @@ module deep_thought {
     ast,
     {
       nodeType: "module",
-      defs: [
+      items: [
         {
           nodeType: "def",
           declare: {
@@ -684,7 +684,7 @@ module deep_thought {
             name: "deep_thought",
             mod: {
               nodeType: "module",
-              defs: [
+              items: [
                 {
                   nodeType: "def",
                   declare: {
@@ -704,7 +704,7 @@ module deep_thought {
 });
 
 Deno.test("parsing module item access with path syntax test", () => {
-  const lexer = new Lexer("!a::b::c::d || false");
+  const lexer = new Lexer("!a::b || false");
   const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
@@ -719,18 +719,54 @@ Deno.test("parsing module item access with path syntax test", () => {
         operand: {
           nodeType: "path",
           sup: "a",
-          sub: {
-            nodeType: "path",
-            sup: "b",
-            sub: {
-              nodeType: "path",
-              sup:"c",
-              sub: { nodeType: "globalVar", name: "d" }
-            }
-          }
+          sub: { nodeType: "globalVar", name: "b" }
         }
       },
       right: { nodeType: "bool", value: false }
+    }
+  );
+});
+
+Deno.test("parsing import statement test", () => {
+  const lexer = new Lexer("import a::b::c; import d::e::f as hello;");
+  const parser = new Parser(lexer, ".");
+  const ast = parser.parse().mod;
+
+  assertEquals(
+    ast,
+    {
+      nodeType: "module",
+      items: [
+        {
+          nodeType: "import",
+          path: {
+            nodeType: "path",
+            sup: "a",
+            sub: {
+              nodeType: "path",
+              sup: "b",
+              sub: { nodeType: "globalVar", name: "c" }
+            }
+          },
+          asName: undefined
+        },
+        {
+          nodeType: "import",
+          path: {
+            nodeType: "path",
+            sup: "d",
+            sub: {
+              nodeType: "path",
+              sup: "e",
+              sub: { nodeType: "globalVar", name: "f" }
+            }
+          },
+          asName: {
+            nodeType: "globalVar",
+            name: "hello"
+          }
+        }
+      ]
     }
   );
 });
