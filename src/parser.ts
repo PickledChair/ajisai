@@ -83,6 +83,16 @@ export class Parser {
       asName = { nodeType: "globalVar", name: asNameToken.value };
     }
     this.expect(";");
+
+    const modName = (() => {
+      let p = path;
+      while (p.nodeType === "path") p = p.sub;
+      return p.name;
+    })();
+    if (modName === "super" || modName === "package") {
+      asName = { nodeType: "globalVar", name: modName };
+    }
+
     return { nodeType: "import", path, asName };
   }
 

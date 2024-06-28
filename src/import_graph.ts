@@ -12,7 +12,7 @@ type ModuleTreeNode = {
   mod: AstModuleNode,
   subMods: ModuleTreeNode[],
   importPaths: { path: AstPathNode | AstGlobalVarNode, asName?: AstGlobalVarNode }[],
-  superMod: ModuleTreeNode | "root_module",
+  superMod: ModuleTreeNode | undefined,
   visitStatus: VisitStatus
 };
 
@@ -34,7 +34,7 @@ class ModuleRenamer {
 
 const makeModuleTree = (
   modDeclare: AstModuleDeclareNode,
-  superMod: ModuleTreeNode | "root_module",
+  superMod: ModuleTreeNode | undefined,
   modRenamer: ModuleRenamer
 ): ModuleTreeNode => {
   const { name, mod } = modDeclare;
@@ -75,13 +75,13 @@ const resolvePath = (
   path: AstPathNode | AstGlobalVarNode
 ): ModuleTreeNode => {
   if (path.nodeType === "globalVar") {
-    if (path.name === "root") {
+    if (path.name === "package") {
       // FIXME: path に親があったらこの結果は不自然
       return root;
     } else if (path.name === "super") {
       const superMod = modTree.superMod;
-      if (superMod === "root_module") {
-        return root;
+      if (superMod == null) {
+        throw new Error("package root module does not have super module");
       } else {
         return superMod;
       }
@@ -97,10 +97,10 @@ const resolvePath = (
     const { sup, sub } = path;
 
     let startNode: ModuleTreeNode | undefined = undefined;
-    if (sup === "root") {
+    if (sup === "package") {
       startNode = root;
     } else if (sup === "super") {
-      if (modTree.superMod === "root_module") {
+      if (modTree.superMod == null) {
         startNode = root;
       } else {
         startNode = modTree.superMod;
@@ -163,6 +163,6 @@ const makeImportGraph1 = (
 
 export const makeImportGraph = (modDeclare: AstModuleDeclareNode): ImportGraphNode => {
   const modRenamer = new ModuleRenamer();
-  const modTree = makeModuleTree(modDeclare, "root_module", modRenamer);
+  const modTree = makeModuleTree(modDeclare, undefined, modRenamer);
   return makeImportGraph1(modTree, modTree);
 };

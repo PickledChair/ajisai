@@ -8,7 +8,7 @@ module a {
     }
 
     module c {
-        import root::d;
+        import package::d;
 
         func hello() {
             d::hello()
