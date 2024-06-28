@@ -19,14 +19,20 @@ module a {
     }
 }
 
+import arith;
+import arith::deep_thought;
+import a as a1;
+import a::a as a2;
+import a::a::a as a3;
+
 func main() {
     println_i32(arith::add(10, 5));
     println_i32(arith::sub(10, 5));
     println_i32(arith::mul(10, 5));
     println_i32(arith::div(10, 5));
-    println_i32(arith::deep_thought::answer());
+    println_i32(deep_thought::answer());
 
-    println_str(a::hello());
-    println_str(a::a::hello());
-    println_str(a::a::a::hello());
+    println_str(a1::hello());
+    println_str(a2::hello());
+    println_str(a3::hello());
 }
