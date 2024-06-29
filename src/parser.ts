@@ -77,13 +77,8 @@ export class Parser {
     if (this.eat("::")) {
       path = this.parsePath(path.name);
     }
-    let asName: AstGlobalVarNode | undefined = undefined;
-    if (this.eat("as")) {
-      const asNameToken = this.expect("identifier");
-      asName = { nodeType: "globalVar", name: asNameToken.value };
-    }
-    this.expect(";");
 
+    let asName: AstGlobalVarNode | undefined = undefined;
     const modName = (() => {
       let p = path;
       while (p.nodeType === "path") p = p.sub;
@@ -92,7 +87,12 @@ export class Parser {
     if (modName === "super" || modName === "package") {
       asName = { nodeType: "globalVar", name: modName };
     }
+    if (this.eat("as")) {
+      const asNameToken = this.expect("identifier");
+      asName = { nodeType: "globalVar", name: asNameToken.value };
+    }
 
+    this.expect(";");
     return { nodeType: "import", path, asName };
   }
 

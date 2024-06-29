@@ -728,7 +728,14 @@ Deno.test("parsing module item access with path syntax test", () => {
 });
 
 Deno.test("parsing import statement test", () => {
-  const lexer = new Lexer("import a::b::c; import d::e::f as hello;");
+  const lexer = new Lexer(`
+import a::b::c;
+import d::e::f as hello;
+import a::super;
+import package;
+import a::super as asuper;
+import package as hello;
+`);
   const parser = new Parser(lexer, ".");
   const ast = parser.parse().mod;
 
@@ -765,7 +772,35 @@ Deno.test("parsing import statement test", () => {
             nodeType: "globalVar",
             name: "hello"
           }
-        }
+        },
+        {
+          nodeType: "import",
+          path: {
+            nodeType: "path",
+            sup: "a",
+            sub: { nodeType: "globalVar", name: "super" }
+          },
+          asName: { nodeType: "globalVar", name: "super" }
+        },
+        {
+          nodeType: "import",
+          path: { nodeType: "globalVar", name: "package" },
+          asName: { nodeType: "globalVar", name: "package" }
+        },
+        {
+          nodeType: "import",
+          path: {
+            nodeType: "path",
+            sup: "a",
+            sub: { nodeType: "globalVar", name: "super" }
+          },
+          asName: { nodeType: "globalVar", name: "asuper" }
+        },
+        {
+          nodeType: "import",
+          path: { nodeType: "globalVar", name: "package" },
+          asName: { nodeType: "globalVar", name: "hello" }
+        },
       ]
     }
   );
