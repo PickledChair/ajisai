@@ -175,6 +175,7 @@ class SemanticAnalyzer {
   #additional_defs: AstDefNode[] = [];
   clsId: number;
   #defTypeMap: DefTypeMap;
+  #inFuncDef = false;
 
   constructor(
     importGraph: ImportGraphNode,
@@ -241,25 +242,26 @@ class SemanticAnalyzer {
 
   private analyzeDef(ast: AstDefNode, modEnv: VarEnv): AstDefNode {
     if (ast.declare.nodeType === "declare") {
+      // moduleのトップレベルの定義は型注釈を必須にする
+      if (ast.declare.ty == null) throw new Error("definition without type signature");
+
+      if (ast.declare.ty.tyKind === "func") this.#inFuncDef = true;
       const [exprNode, exprTy] = this.analyzeExpr(ast.declare.value, modEnv);
-      if (ast.declare.ty) {
-        if (tyEqual(ast.declare.ty, exprTy)) {
-          return {
-            nodeType: "def",
-            declare: {
-              nodeType: "declare",
-              name: ast.declare.name,
-              ty: ast.declare.ty,
-              value: exprNode,
-              modName: this.#importGraph.modName.renamed
-            }
-          };
-        } else {
-          throw new Error("invalid expr type");
-        }
+      this.#inFuncDef = false;
+
+      if (tyEqual(ast.declare.ty, exprTy)) {
+        return {
+          nodeType: "def",
+          declare: {
+            nodeType: "declare",
+            name: ast.declare.name,
+            ty: ast.declare.ty,
+            value: exprNode,
+            modName: this.#importGraph.modName.renamed
+          }
+        };
       } else {
-        // moduleのトップレベルの定義は型注釈を必須にする
-        throw new Error("definition without type signature");
+        throw new Error("invalid expr type");
       }
     }
     if (ast.declare.nodeType === "moduleDeclare") {
@@ -273,7 +275,7 @@ class SemanticAnalyzer {
 
     if (ast.nodeType === "func") {
       const [node, ty] = this.analyzeFunc(ast, new VarEnv("func", varEnv));
-      if (varEnv.envKind !== "module") {
+      if (varEnv.envKind !== "module" || !this.#inFuncDef) {
         node.rootIdx = varEnv.freshRootId();
       }
       ast = node;
@@ -420,7 +422,7 @@ class SemanticAnalyzer {
 
     const funcTy: Type = {
       tyKind: "func",
-      funcKind: varEnv.parent_!.envKind === "module" ? "userdef" : "closure",
+      funcKind: (varEnv.parent_!.envKind === "module" && this.#inFuncDef) ? "userdef" : "closure",
       argTypes,
       bodyType
     };
@@ -432,7 +434,7 @@ class SemanticAnalyzer {
       envId: varEnv.envId,
       bodyTy: bodyType,
       rootTableSize: varEnv.rootTableSize,
-      closureId: varEnv.parent_!.envKind === "module" ? undefined : this.freshClsId(),
+      closureId: (varEnv.parent_!.envKind === "module" && this.#inFuncDef) ? undefined : this.freshClsId(),
       ty: funcTy
     };
 

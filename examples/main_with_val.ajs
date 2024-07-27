@@ -1,4 +1,4 @@
-val main: func() = func() {
+val main: fn() = fn() {
     println_str("hello!")
 };
 

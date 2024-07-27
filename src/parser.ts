@@ -136,7 +136,7 @@ export class Parser {
       this.expect(")");
       return { tyKind: "primitive", name: "()" };
     } else {
-      if (this.eat("func")) {
+      if (this.eat("fn")) {
         this.expect("(");
 
         const argTypes: Type[] = [];
@@ -516,7 +516,7 @@ export class Parser {
       expr = this.parseIf();
     }
 
-    if (expr == null && this.eat("func")) {
+    if (expr == null && this.eat("fn")) {
       expr = this.parseFunc();
     }
 

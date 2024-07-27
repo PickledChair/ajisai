@@ -1,8 +1,8 @@
-let val t0 = func() {
+let val t0 = fn() {
     println_str("t0 start");
-    let val t1 = func() {
+    let val t1 = fn() {
         println_str("t1 start");
-        let val t2 = func() {
+        let val t2 = fn() {
             println_str("t2 start");
             println_str("t2 end")
         } {
