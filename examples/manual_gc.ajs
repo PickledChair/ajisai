@@ -14,3 +14,5 @@ func main() {
     gc_start();
     print_repeated_str("Piyo", 4)
 }
+
+main();

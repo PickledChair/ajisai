@@ -11,6 +11,4 @@ func countup_inner(x: i32, until: i32) {
     }
 }
 
-func main() {
-    countup(10)
-}
+countup(10);

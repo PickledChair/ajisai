@@ -1,3 +1,5 @@
 val main: func() = func() {
     println_str("hello!")
 };
+
+main();

@@ -1,13 +1,11 @@
-func main() {
-    println_i32(
-        let val a = 3
-            val b = if a == 2 { 2 } else { 5 }
-        {
-            if a != 1 {
-                let val c = b { c }
-            } else {
-                42
-            }
+println_i32(
+    let val a = 3
+        val b = if a == 2 { 2 } else { 5 }
+    {
+        if a != 1 {
+            let val c = b { c }
+        } else {
+            42
         }
-    )
-}
+    }
+);

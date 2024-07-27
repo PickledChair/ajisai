@@ -9,8 +9,8 @@ export type AstNode =
   | AstDeclareNode
   | AstExprNode;
 
-export type AstModuleNode = { nodeType: "module", items: AstModuleItemNode[] };
-export type AstModuleItemNode = AstDefNode | AstImportNode;
+export type AstModuleNode = { nodeType: "module", items: AstModuleItemNode[], envId: number, rootTableSize?: number };
+export type AstModuleItemNode = AstDefNode | AstImportNode | AstExprStmtNode;
 
 export type AstDefNode = { nodeType: "def", declare: AstDeclareNode | AstModuleDeclareNode };
 
@@ -21,6 +21,8 @@ export type AstImportNode = {
 };
 
 export type AstModuleDeclareNode = { nodeType: "moduleDeclare", name: string, mod: AstModuleNode };
+
+export type AstExprStmtNode = { nodeType: "exprStmt", expr: AstExprNode };
 
 export type AstExprNode =
   AstExprSeqNode

@@ -1,20 +1,18 @@
-func main() {
-    let val t0 = func() {
-        println_str("t0 start");
-        let val t1 = func() {
-            println_str("t1 start");
-            let val t2 = func() {
-                println_str("t2 start");
-                println_str("t2 end")
-            } {
-                t2()
-            };
-            println_str("t1 end")
+let val t0 = func() {
+    println_str("t0 start");
+    let val t1 = func() {
+        println_str("t1 start");
+        let val t2 = func() {
+            println_str("t2 start");
+            println_str("t2 end")
         } {
-            t1()
+            t2()
         };
-        println_str("t0 end")
+        println_str("t1 end")
     } {
-        t0()
-    }
-}
+        t1()
+    };
+    println_str("t0 end")
+} {
+    t0()
+};

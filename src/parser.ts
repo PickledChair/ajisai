@@ -16,6 +16,7 @@ import {
   AstPathNode,
   AstModuleDeclareNode,
   AstImportNode,
+  AstExprStmtNode,
 } from "./ast.ts";
 import { Type, isPrimitiveTypeName } from "./type.ts";
 
@@ -64,11 +65,14 @@ export class Parser {
       } else if (this.eat("import")) {
         items.push(this.parseImport());
       } else {
-        throw new Error("invalid definition");
+        const expr = this.parseExpr();
+        this.expect(";");
+        const exprStmt: AstExprStmtNode = { nodeType: "exprStmt", expr };
+        items.push(exprStmt);
       }
     }
 
-    return { nodeType: "module", items };
+    return { nodeType: "module", items, envId: -1 };
   }
 
   private parseImport(): AstImportNode {

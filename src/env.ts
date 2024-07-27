@@ -20,10 +20,9 @@ export class VarEnv {
 
   private incrementTmpId(): number {
     switch (this.envKind) {
+      case "module":
       case "func":
         return this.#freshRootId++;
-      case "module":
-        throw new Error("module level environment doesn't have root table");
       case "let":
         return this.parent_!.incrementTmpId();
     }

@@ -1,3 +1,1 @@
-func main() {
-    func() { println_str("hello!") }()
-}
+func() { println_str("hello!") }();

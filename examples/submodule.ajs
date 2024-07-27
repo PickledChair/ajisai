@@ -36,3 +36,5 @@ func main() {
     println_str(a2::hello());
     println_str(a3::hello());
 }
+
+main();

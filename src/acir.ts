@@ -4,13 +4,16 @@ export type ACModuleInst = {
   inst: "module",
   funcDecls: ACDeclInst[],
   funcDefs: ACDefInst[],
-  entry?: ACEntryInst
+  modInits: ACModInitDefInst[],
+  entryModName: string,
 };
 
 export type ACDeclInst = ACFuncDeclInst | ACClosureDeclInst;
 export type ACDefInst = ACFuncDefInst | ACClosureDefInst;
 
-export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
+// export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
+// FIXME: body の要素は ACFuncDefInst ではない。モジュールレベル変数の初期化命令も必要になるため。
+export type ACModInitDefInst = { inst: "mod_init.def" , body: ACFuncBodyInst[], modName: string };
 
 export type ACFuncDeclInst = {
   inst: "func.decl", funcName: string, args: [string, Type][], resultType: Type,

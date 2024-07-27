@@ -24,6 +24,4 @@ module d {
 
 import a::b;
 
-func main() {
-    b::hello()
-}
+b::hello();

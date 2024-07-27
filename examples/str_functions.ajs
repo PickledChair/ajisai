@@ -10,6 +10,4 @@ func print_equal(src: str, value: str, count: i32, end: i32) {
     }
 }
 
-func main() {
-    print_equal("Hoge", "HogeHogeHogeHoge", 0, 10)
-}
+print_equal("Hoge", "HogeHogeHogeHoge", 0, 10);

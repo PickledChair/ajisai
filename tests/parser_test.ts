@@ -204,6 +204,7 @@ Deno.test("parsing func definition test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -284,6 +285,7 @@ Deno.test("parsing empty main func test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -322,6 +324,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -523,6 +526,7 @@ Deno.test("parsing val definition test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -556,6 +560,7 @@ Deno.test("parsing empty main func (as val definition) test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -676,6 +681,7 @@ module deep_thought {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -684,6 +690,7 @@ module deep_thought {
             name: "deep_thought",
             mod: {
               nodeType: "module",
+              envId: -1,
               items: [
                 {
                   nodeType: "def",
@@ -743,6 +750,7 @@ import package as hello;
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "import",

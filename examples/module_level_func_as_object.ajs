@@ -13,3 +13,5 @@ func main() {
         three(10)
     }
 }
+
+main();
