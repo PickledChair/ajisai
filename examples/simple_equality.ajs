@@ -1,3 +1,1 @@
-func main() {
-    println_bool(1 == 1)
-}
+println_bool(1 == 1);

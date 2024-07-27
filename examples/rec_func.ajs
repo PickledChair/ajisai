@@ -10,4 +10,4 @@ func factorial_inner(accum: i32, x: i32) -> i32 {
     }
 }
 
-func main() { println_i32(factorial(10)) }
+println_i32(factorial(10));

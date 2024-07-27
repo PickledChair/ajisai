@@ -1,12 +1,13 @@
 import {
   ACClosureMakeInst,
-  ACEntryInst,
   ACModuleInst,
   ACFuncBodyInst,
   ACDeclInst,
   ACDefInst,
   ACFuncFrameDefTmpNoValInst,
-  ACPushValInst
+  ACPushValInst,
+  ACModInitDefInst,
+  ACModInitBodyInst
 } from "./acir.ts";
 
 import {
@@ -31,6 +32,12 @@ import {
   tyEqual
 } from "./type.ts";
 
+type ModuleInitializer = { nodeType: "modInitializer", items: ModuleInitItem[], envId: number, rootTableSize: number };
+type ModuleInitItem = ExprStmtItem | ImportModItem;
+type ExprStmtItem = { itemType: "exprStmt", expr: AstExprNode };
+type ImportModItem = { itemType: "importMod", modName: string };
+// type ValDefItem = { itemType: "valDef", def: AstDefNode  };
+
 export class CodeGenerator {
   #importGraph: ImportGraphNode;
 
@@ -41,18 +48,51 @@ export class CodeGenerator {
   codegen(): ACModuleInst {
     let funcDecls: ACDeclInst[] = [];
     let funcDefs: ACDefInst[] = [];
-    let entry = undefined;
+    let modInits: ACModInitDefInst[] = [];
 
-    for (const subImportGraph of this.#importGraph.importMods.values()) {
+    const modInitsNumMap: Map<string, { renamed: string, initsNum: number }> = new Map();
+
+    for (const [asName, subImportGraph] of this.#importGraph.importMods.entries()) {
       const codeGen = new CodeGenerator(subImportGraph);
-      const { funcDecls: subFuncDecls, funcDefs: subFuncDefs } = codeGen.codegen();
+      const { funcDecls: subFuncDecls, funcDefs: subFuncDefs, modInits: subModInits } = codeGen.codegen();
+
+      modInitsNumMap.set(asName, {
+        renamed: subImportGraph.modName.renamed,
+        initsNum: subModInits.length,
+      });
+
       funcDecls = subFuncDecls.concat(funcDecls);
       funcDefs = subFuncDefs.concat(funcDefs);
+      modInits = subModInits.concat(modInits);
     }
 
+    const modInitItems: ModuleInitItem[] = [];
+
     for (const item of this.#importGraph.mod.items) {
-      if (item.nodeType === "import") continue;
+      if (item.nodeType === "import") {
+        if (item.asName == null) throw new Error("unreachable");
+
+        // NOTE: asName には意味解析フェーズでモジュール中での使用名が与えられている
+        const modInitsNum = modInitsNumMap.get(item.asName.name);
+        if (modInitsNum == null) throw new Error("unreachable");
+
+        if (modInitsNum.initsNum > 0) {
+          modInitItems.push({
+            itemType: "importMod",
+            modName: modInitsNum.renamed,
+          });
+        }
+        continue;
+      }
+
+      if (item.nodeType === "exprStmt") {
+        modInitItems.push({ itemType: "exprStmt", expr: item.expr });
+        continue;
+      }
+
       if (item.declare.nodeType === "moduleDeclare") continue;
+
+      // declare
       if (item.declare.value.nodeType === "func") {
         if (item.declare.ty?.tyKind !== "func") throw new Error("unreachable");
         const funcCodeGen = new FuncCodeGenerator(
@@ -61,17 +101,34 @@ export class CodeGenerator {
           item.declare.value as AstFuncNode,
           item.declare.modName!
         );
-        const [funcDecl, funcDef] = funcCodeGen.codegen();
-        if (funcDecl) funcDecls.push(funcDecl);
-        if (funcDef.inst === "func.def" || funcDef.inst === "closure.def") {
-          funcDefs.push(funcDef);
-        } else if (funcDef.inst === "entry") {
-          entry = funcDef;
-        }
+        const [funcDecl, funcDef] = funcCodeGen.codegenFunc();
+        funcDecls.push(funcDecl);
+        funcDefs.push(funcDef);
       }
     }
 
-    return { inst: "module", funcDecls, funcDefs, entry };
+    if (modInitItems.length > 0) {
+      const modInitDef: ModuleInitializer = {
+        nodeType: "modInitializer",
+        items: modInitItems,
+        envId: this.#importGraph.mod.envId,
+        rootTableSize: this.#importGraph.mod.rootTableSize!,
+      };
+      const modInitCodeGen = new FuncCodeGenerator(
+        "",
+        {
+          tyKind: "func",
+          funcKind: "modinit",
+          argTypes: [],
+          bodyType: { tyKind: "primitive", name: "()" },
+        },
+        modInitDef,
+        this.#importGraph.modName.renamed,
+      );
+      modInits.push(modInitCodeGen.codegenModInit());
+    }
+
+    return { inst: "module", funcDecls, funcDefs, modInits, entryModName: this.#importGraph.modName.renamed };
   }
 }
 
@@ -133,21 +190,67 @@ const getExprType = (expr: AstExprNode): Type | undefined => {
 
 class FuncCodeGenerator {
   #funcTy: FuncType;
-  #funcNode: AstFuncNode;
+  #funcNode: AstFuncNode | ModuleInitializer;
   #funcCtx: FuncContext;
   #modName: string;
 
-  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode, modName: string) {
+  constructor(funcName: string, funcTy: FuncType, func: AstFuncNode | ModuleInitializer, modName: string) {
     this.#funcTy = funcTy;
     this.#funcNode = func;
     this.#funcCtx = new FuncContext(funcName, func.envId);
     this.#modName = modName;
   }
 
-  codegen(): [ACDeclInst | undefined, ACDefInst | ACEntryInst] {
+  codegenFunc(): [ACDeclInst, ACDefInst] {
+    if (this.#funcNode.nodeType === "modInitializer")
+      throw new Error("function expected, but module initializer found");
+
     const funcDeclInst = this.makeFuncDeclInst();
 
+    const body = this.codegenFuncBody(funcDeclInst.resultType);
+
+    return [
+      funcDeclInst,
+      {
+        inst: this.#funcNode.closureId == null ? "func.def" : "closure.def",
+        funcName: funcDeclInst.funcName,
+        args: funcDeclInst.args,
+        resultType: funcDeclInst.resultType,
+        modName: this.#modName,
+        envId: this.#funcCtx.funcEnvId,
+        body
+      }
+    ];
+  }
+
+  private makeFuncDeclInst(): ACDeclInst {
+    if (this.#funcNode.nodeType === "modInitializer")
+      throw new Error("function expected, but module initializer found");
+
+    return {
+      inst: this.#funcNode.closureId == null ? "func.decl" : "closure.decl",
+      funcName: this.#funcCtx.funcName,
+      args: this.#funcNode.args.map(arg => [arg.name, arg.ty!]),
+      resultType: this.#funcTy.bodyType,
+      modName: this.#modName
+    };
+  }
+
+  codegenModInit(): ACModInitDefInst {
+    const body = this.codegenModInitBody();
+    return {
+      inst: "mod_init.def",
+      body,
+      modName: this.#modName,
+    };
+  }
+
+  private codegenFuncBody(resultType: Type): ACFuncBodyInst[] {
+    if (this.#funcNode.nodeType === "modInitializer")
+      throw new Error("function expected, but module initializer found");
+
     let bodyInsts: ACFuncBodyInst[]  = [];
+
     if (this.#funcNode.rootTableSize! > 0) {
       bodyInsts.push({ inst: "root_table.init", size: this.#funcNode.rootTableSize! });
     }
@@ -160,42 +263,40 @@ class FuncCodeGenerator {
     }
 
     if (valInst) {
-      if (tyEqual(funcDeclInst.resultType, { tyKind: "primitive", name: "()" })) {
+      if (tyEqual(resultType, { tyKind: "primitive", name: "()" })) {
         bodyInsts.push(valInst);
       } else {
         bodyInsts.push({ inst: "func.return", value: valInst });
       }
     }
 
-    if (funcDeclInst.funcName === "main") {
-      return [
-        undefined,
-        { inst: "entry", body: bodyInsts }
-      ];
-    } else {
-      return [
-        funcDeclInst,
-        {
-          inst: this.#funcNode.closureId == null ? "func.def" : "closure.def",
-          funcName: funcDeclInst.funcName,
-          args: funcDeclInst.args,
-          resultType: funcDeclInst.resultType,
-          modName: this.#modName,
-          envId: this.#funcCtx.funcEnvId,
-          body: bodyInsts
-        }
-      ];
-    }
+    return bodyInsts;
   }
 
-  private makeFuncDeclInst(): ACDeclInst {
-    return {
-      inst: this.#funcNode.closureId == null ? "func.decl" : "closure.decl",
-      funcName: this.#funcCtx.funcName,
-      args: this.#funcNode.args.map(arg => [arg.name, arg.ty!]),
-      resultType: this.#funcTy.bodyType,
-      modName: this.#modName
-    };
+  private codegenModInitBody(): ACModInitBodyInst[] {
+    if (this.#funcNode.nodeType === "func")
+      throw new Error("module initializer expected, but function found");
+
+    let bodyInsts: ACModInitBodyInst[]  = [];
+
+    if (this.#funcNode.rootTableSize! > 0) {
+      bodyInsts.push({ inst: "root_table.init", size: this.#funcNode.rootTableSize });
+    }
+    bodyInsts.push({ inst: "func_frame.init", rootTableSize: this.#funcNode.rootTableSize });
+
+    for (const item of this.#funcNode.items) {
+      if (item.itemType === "importMod") {
+        bodyInsts.push({ inst: "mod.init", modName: item.modName });
+        continue;
+      }
+
+      // ExprStmtItem
+      const { prelude, valInst } = this.codegenExpr(item.expr);
+      if (prelude) bodyInsts = bodyInsts.concat(prelude);
+      if (valInst) bodyInsts.push(valInst);
+    }
+
+    return bodyInsts;
   }
 
   private codegenExpr(ast: AstExprNode): { prelude?: ACFuncBodyInst[], valInst?: ACPushValInst } {

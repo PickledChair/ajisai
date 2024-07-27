@@ -19,6 +19,4 @@ func fizzbuzz_iter(cur: i32, end: i32) {
     }
 }
 
-func main() {
-    fizzbuzz(1, 100)
-}
+fizzbuzz(1, 100);

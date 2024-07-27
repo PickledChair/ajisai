@@ -4,13 +4,17 @@ export type ACModuleInst = {
   inst: "module",
   funcDecls: ACDeclInst[],
   funcDefs: ACDefInst[],
-  entry?: ACEntryInst
+  modInits: ACModInitDefInst[],
+  entryModName: string,
 };
 
 export type ACDeclInst = ACFuncDeclInst | ACClosureDeclInst;
 export type ACDefInst = ACFuncDefInst | ACClosureDefInst;
 
-export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
+// export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
+export type ACModInitBodyInst = ACFuncBodyInst | ACModInitInst;
+export type ACModInitInst = { inst: "mod.init", modName: string };
+export type ACModInitDefInst = { inst: "mod_init.def" , body: ACModInitBodyInst[], modName: string };
 
 export type ACFuncDeclInst = {
   inst: "func.decl", funcName: string, args: [string, Type][], resultType: Type,

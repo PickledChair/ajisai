@@ -204,6 +204,7 @@ Deno.test("parsing func definition test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -284,6 +285,7 @@ Deno.test("parsing empty main func test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -322,6 +324,7 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -383,8 +386,8 @@ Deno.test("parsing func definition (with expression sequence) test", () => {
   );
 });
 
-Deno.test("parsing func expression test", () => {
-  const lexer = new Lexer("let val add = func(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
+Deno.test("parsing fn expression test", () => {
+  const lexer = new Lexer("let val add = fn(a: i32, b: i32) -> i32 { a + b } { add(1, 2) }");
   const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
@@ -437,8 +440,8 @@ Deno.test("parsing func expression test", () => {
   );
 });
 
-Deno.test("parsing func expression (without arguments) test", () => {
-  const lexer = new Lexer("let val hello = func() { println_str(\"Hello, world!\") } { hello() }");
+Deno.test("parsing fn expression (without arguments) test", () => {
+  const lexer = new Lexer("let val hello = fn() { println_str(\"Hello, world!\") } { hello() }");
   const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
@@ -485,7 +488,7 @@ Deno.test("parsing func expression (without arguments) test", () => {
 });
 
 Deno.test("parsing immediately invoked function test", () => {
-  const lexer = new Lexer("func() { println_str(\"Hello, world!\") }()");
+  const lexer = new Lexer("fn() { println_str(\"Hello, world!\") }()");
   const parser = new Parser(lexer, ".");
   const ast = parser.parseExpr();
 
@@ -523,6 +526,7 @@ Deno.test("parsing val definition test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -548,7 +552,7 @@ Deno.test("parsing val definition test", () => {
 });
 
 Deno.test("parsing empty main func (as val definition) test", () => {
-  const lexer = new Lexer("val main: func() = func() { () };");
+  const lexer = new Lexer("val main: fn() = fn() { () };");
   const parser = new Parser(lexer, ".");
   const ast = parser.parse().mod;
 
@@ -556,6 +560,7 @@ Deno.test("parsing empty main func (as val definition) test", () => {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -676,6 +681,7 @@ module deep_thought {
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "def",
@@ -684,6 +690,7 @@ module deep_thought {
             name: "deep_thought",
             mod: {
               nodeType: "module",
+              envId: -1,
               items: [
                 {
                   nodeType: "def",
@@ -743,6 +750,7 @@ import package as hello;
     ast,
     {
       nodeType: "module",
+      envId: -1,
       items: [
         {
           nodeType: "import",

@@ -8,7 +8,7 @@ export const isPrimitiveTypeName = (s: string): PrimitiveTypeName | null => {
   return (primitiveTypeNames as Readonly<string[]>).includes(s) ? s as PrimitiveTypeName : null;
 };
 
-export type FuncKind = "userdef" | "closure" | "builtin";
+export type FuncKind = "userdef" | "closure" | "builtin" | "modinit";
 export type FuncType = { tyKind: "func", funcKind: FuncKind, argTypes: Type[], bodyType: Type };
 
 export type DummyType = { tyKind: "dummy" };

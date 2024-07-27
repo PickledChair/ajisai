@@ -3,7 +3,7 @@ export type TokenType =
   | "," | ":" | "::" | ";" | "|" | "(" | ")" | "{" | "}"
   | "->"
   | "true" | "false"
-  | "else" | "if" | "let" | "func" | "val" | "module" | "import"
+  | "else" | "if" | "let" | "fn" | "func" | "val" | "module" | "import"
   | "as"
   | "identifier" | "integer" | "string"
   | "eof";
@@ -20,6 +20,7 @@ const keywords = [
   "else",
   "if",
   "let",
+  "fn",
   "func",
   "val",
   "module",

@@ -1,13 +1,7 @@
-import { ACEntryInst, ACIfElseInst, ACModuleInst, ACFuncBodyInst, ACDeclInst, ACDefInst, ACPushValInst } from "./acir.ts";
+import { ACIfElseInst, ACModuleInst, ACFuncBodyInst, ACDeclInst, ACDefInst, ACPushValInst, ACModInitDefInst } from "./acir.ts";
 import { toCType } from "./type.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
-
-const cMain = `int main(void) {
-  ajisai_main();
-  return 0;
-}
-`;
 
 export const printCSrc = async (filePath: string, module: ACModuleInst) => {
   const file = await Deno.open(filePath, { write: true, create: true, truncate: true });
@@ -22,18 +16,22 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
       await printProtoType(writer, encoder, funcDecl);
     }
 
+    for (const modInit of module.modInits) {
+      await writer.write(encoder.encode(`void modinit__${modInit.modName}(AjisaiFuncFrame *parent_frame);\n`));
+    }
+
     for (const funcDef of module.funcDefs) {
       await writer.write(encoder.encode("\n"));
       await printFuncDef(writer, encoder, funcDef);
     }
 
-    if (module.entry) {
+    for (const modInit of module.modInits) {
       await writer.write(encoder.encode("\n"));
-      await printEntry(writer, encoder, module.entry);
-
-      await writer.write(encoder.encode("\n"));
-      await writer.write(encoder.encode(cMain));
+      await printModInitDef(writer, encoder, modInit);
     }
+
+    await writer.write(encoder.encode("\n"));
+    await printMain(writer, encoder, module.entryModName);
   } finally {
     file.close();
   }
@@ -51,20 +49,38 @@ const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: Text
   await writer.write(encoder.encode(line));
 };
 
-const printEntry = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, entry: ACEntryInst) => {
-  await writer.write(encoder.encode("void ajisai_main(void) {\n"));
+const printMain = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, entryModName: string) => {
+  await writer.write(encoder.encode("int main() {\n"));
   await writer.write(encoder.encode("  AjisaiMemManager mem_manager;\n"));
   // TODO: メモリ確保に失敗した時に終了する処理を入れる
   await writer.write(encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
-  await writer.write(encoder.encode("  AjisaiFuncFrame *parent_frame = &(AjisaiFuncFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
+  await writer.write(encoder.encode("  AjisaiFuncFrame func_frame = { .parent = NULL, .mem_manager = &mem_manager };\n"));
 
-  for (const inst of entry.body) {
-    await printFuncBodyInst(writer, encoder, inst);
-  }
+  await writer.write(encoder.encode(`  modinit__${entryModName}(&func_frame);\n`));
 
   await writer.write(encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
+  await writer.write(encoder.encode("  return 0;\n"));
   await writer.write(encoder.encode("}\n"));
 };
+
+const printModInitDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, modInit: ACModInitDefInst) => {
+  await writer.write(encoder.encode(`void modinit__${modInit.modName}(AjisaiFuncFrame *parent_frame) {\n`));
+  await writer.write(encoder.encode("  static bool is_initialized = false;\n"));
+  await writer.write(encoder.encode("  if (!is_initialized) {\n"));
+
+  for (const inst of modInit.body) {
+    if (inst.inst === "mod.init") {
+      await writer.write(encoder.encode(`  modinit__${inst.modName}(&func_frame);\n`));
+    } else {
+      await printFuncBodyInst(writer, encoder, inst);
+    }
+  }
+
+  await writer.write(encoder.encode("  is_initialized = true;\n"));
+  await writer.write(encoder.encode("  }\n"));
+
+  await writer.write(encoder.encode("}\n"));
+}
 
 const printFuncDef = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, def: ACDefInst) => {
   let headLine = `${toCType(def.resultType)} ${def.inst === "func.def" ? `userdef__${def.modName}_` : "closure"}_${def.funcName}(AjisaiFuncFrame *parent_frame`;

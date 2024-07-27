@@ -1,9 +1,9 @@
-func print_func_result(a: i32, b: i32, p: func(i32, i32) -> i32) {
+func print_func_result(a: i32, b: i32, p: fn(i32, i32) -> i32) {
     println_i32(p(a, b))
 }
 
-func get_sub_func() -> func(i32, i32) -> i32 {
-    func(a: i32, b: i32) -> i32 { a - b }
+func get_sub_func() -> fn(i32, i32) -> i32 {
+    fn(a: i32, b: i32) -> i32 { a - b }
 }
 
 func div_func(a: i32, b: i32) -> i32 {
@@ -23,3 +23,5 @@ func main() {
         print_func_result(a, b, div_func)
     }
 }
+
+main();

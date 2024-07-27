@@ -16,3 +16,5 @@ func main() {
         println_i32(add(a, b))
     }
 }
+
+main();

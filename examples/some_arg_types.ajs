@@ -6,6 +6,4 @@ func select_print(left: i32, right: i32, select_left: bool) {
     }
 }
 
-func main() {
-    select_print(1, 2, true)
-}
+select_print(1, 2, true);

@@ -6,10 +6,12 @@ func main() {
     let
         val one = println_i32
         val two = test_userdef
-        val three = func(n: i32) { println_i32(n * 3) }
+        val three = fn(n: i32) { println_i32(n * 3) }
     {
         one(10);
         two(10);
         three(10)
     }
 }
+
+main();
