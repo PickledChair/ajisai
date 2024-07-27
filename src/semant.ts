@@ -14,6 +14,7 @@ import {
   AstExprSeqNode,
   AstModuleDeclareNode,
   AstExprStmtNode,
+  AstImportNode,
 } from "./ast.ts";
 import { ImportGraphNode, makeImportGraph } from "./import_graph.ts";
 
@@ -213,9 +214,30 @@ class SemanticAnalyzer {
 
     for (const item of ast.items) {
       // FIXME: import する前のモジュールの使用は禁止する
-      if (item.nodeType === "import") continue;
-      if (item.nodeType === "def") {
+      if (item.nodeType === "import") {
+        let modName: string | undefined = undefined;
+
+        if (item.asName) {
+          modName = item.asName.name;
+        } else {
+          let path = item.path;
+          while (path.nodeType !== "globalVar") path = path.sub;
+          modName = path.name;
+        }
+
+        const importNode: AstImportNode = {
+          nodeType: "import",
+          path: item.path,
+          asName: {
+            nodeType: "globalVar",
+            name: modName,
+          },
+        };
+
+        items.push(importNode);
+      } else if (item.nodeType === "def") {
         if (item.declare.nodeType === "moduleDeclare") continue;
+
         items.push(this.analyzeDef(item, modEnv));
       } else if (item.nodeType === "exprStmt") {
         const exprStmt: AstExprStmtNode = {

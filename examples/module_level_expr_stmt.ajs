@@ -1,0 +1,7 @@
+module hoge {
+    println_str("hoge");
+}
+
+import hoge;
+
+println_str("fuga");

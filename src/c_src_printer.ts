@@ -54,9 +54,9 @@ const printMain = async (writer: WritableStreamDefaultWriter, encoder: TextEncod
   await writer.write(encoder.encode("  AjisaiMemManager mem_manager;\n"));
   // TODO: メモリ確保に失敗した時に終了する処理を入れる
   await writer.write(encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
-  await writer.write(encoder.encode("  AjisaiFuncFrame *func_frame = &(AjisaiFuncFrame){ .parent = NULL, .mem_manager = &mem_manager };\n"));
+  await writer.write(encoder.encode("  AjisaiFuncFrame func_frame = { .parent = NULL, .mem_manager = &mem_manager };\n"));
 
-  await writer.write(encoder.encode(`  modinit__${entryModName}(func_frame);\n`));
+  await writer.write(encoder.encode(`  modinit__${entryModName}(&func_frame);\n`));
 
   await writer.write(encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
   await writer.write(encoder.encode("  return 0;\n"));
@@ -69,7 +69,11 @@ const printModInitDef = async (writer: WritableStreamDefaultWriter, encoder: Tex
   await writer.write(encoder.encode("  if (!is_initialized) {\n"));
 
   for (const inst of modInit.body) {
-    await printFuncBodyInst(writer, encoder, inst);
+    if (inst.inst === "mod.init") {
+      await writer.write(encoder.encode(`  modinit__${inst.modName}(&func_frame);\n`));
+    } else {
+      await printFuncBodyInst(writer, encoder, inst);
+    }
   }
 
   await writer.write(encoder.encode("  is_initialized = true;\n"));
