@@ -5,16 +5,16 @@ module arith {
     func div(a: i32, b: i32) -> i32 { a / b }
 
     module deep_thought {
-        func answer() -> i32 { 42 }
+        val answer: i32 = 21 * 2;
     }
 }
 
 module a {
-    func hello() -> str { "hello1" }
+    val hello: str = "hello1";
     module a {
-        func hello() -> str { "hello2" }
+        val hello: str = "hello2";
         module a {
-            func hello() -> str { "hello3" }
+            val hello: str = "hello3";
         }
     }
 }
@@ -30,11 +30,11 @@ func main() {
     println_i32(arith::sub(10, 5));
     println_i32(arith::mul(10, 5));
     println_i32(arith::div(10, 5));
-    println_i32(deep_thought::answer());
+    println_i32(deep_thought::answer);
 
-    println_str(a1::hello());
-    println_str(a2::hello());
-    println_str(a3::hello());
+    println_str(a1::hello);
+    println_str(a2::hello);
+    println_str(a3::hello);
 }
 
 main();

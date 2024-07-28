@@ -1,4 +1,14 @@
-import { ACIfElseInst, ACModuleInst, ACFuncBodyInst, ACDeclInst, ACDefInst, ACPushValInst, ACModInitDefInst } from "./acir.ts";
+import {
+  ACIfElseInst,
+  ACModuleInst,
+  ACFuncBodyInst,
+  ACDefInst,
+  ACPushValInst,
+  ACModInitDefInst,
+  ACFuncDeclInst,
+  ACClosureDeclInst,
+  ACValDeclInst
+} from "./acir.ts";
 import { toCType } from "./type.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
@@ -12,8 +22,12 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 
     await writer.write(encoder.encode(defaultFileHeader));
 
-    for (const funcDecl of module.funcDecls) {
-      await printProtoType(writer, encoder, funcDecl);
+    for (const decl of module.decls) {
+      if (decl.inst === "func.decl" || decl.inst === "closure.decl") {
+        await printProtoType(writer, encoder, decl);
+      } else {
+        await printGlovalVar(writer, encoder, decl);
+      }
     }
 
     for (const modInit of module.modInits) {
@@ -37,7 +51,11 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
   }
 };
 
-const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, decl: ACDeclInst) => {
+const printProtoType = async (
+  writer: WritableStreamDefaultWriter,
+  encoder: TextEncoder,
+  decl: ACFuncDeclInst | ACClosureDeclInst,
+) => {
   let line = `${toCType(decl.resultType)} ${decl.inst === "func.decl" ? `userdef__${decl.modName}_` : "closure"}_${decl.funcName}(AjisaiFuncFrame *parent_frame`;
 
   for (const [argName, argTy] of decl.args) {
@@ -48,6 +66,14 @@ const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: Text
 
   await writer.write(encoder.encode(line));
 };
+
+const printGlovalVar = async(
+  writer: WritableStreamDefaultWriter,
+  encoder: TextEncoder,
+  decl: ACValDeclInst,
+) => {
+  await writer.write(encoder.encode(`${toCType(decl.ty)} userdef__${decl.modName}__${decl.varName};\n`));
+}
 
 const printMain = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, entryModName: string) => {
   await writer.write(encoder.encode("int main() {\n"));
@@ -71,6 +97,8 @@ const printModInitDef = async (writer: WritableStreamDefaultWriter, encoder: Tex
   for (const inst of modInit.body) {
     if (inst.inst === "mod.init") {
       await writer.write(encoder.encode(`  modinit__${inst.modName}(&func_frame);\n`));
+    } else if (inst.inst === "mod_val.init") {
+      await writer.write(encoder.encode(`  userdef__${inst.modName}__${inst.varName} = ${makePushValLiteral(inst.value)};\n`));
     } else {
       await printFuncBodyInst(writer, encoder, inst);
     }

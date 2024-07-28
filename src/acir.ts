@@ -2,18 +2,19 @@ import { FuncKind, Type } from "./type.ts";
 
 export type ACModuleInst = {
   inst: "module",
-  funcDecls: ACDeclInst[],
+  decls: ACDeclInst[],
   funcDefs: ACDefInst[],
   modInits: ACModInitDefInst[],
   entryModName: string,
 };
 
-export type ACDeclInst = ACFuncDeclInst | ACClosureDeclInst;
+export type ACDeclInst = ACFuncDeclInst | ACClosureDeclInst | ACValDeclInst;
 export type ACDefInst = ACFuncDefInst | ACClosureDefInst;
 
 // export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
-export type ACModInitBodyInst = ACFuncBodyInst | ACModInitInst;
+export type ACModInitBodyInst = ACFuncBodyInst | ACModInitInst | ACModValInitInst;
 export type ACModInitInst = { inst: "mod.init", modName: string };
+export type ACModValInitInst = { inst: "mod_val.init", varName: string, modName: string, value: ACPushValInst };
 export type ACModInitDefInst = { inst: "mod_init.def" , body: ACModInitBodyInst[], modName: string };
 
 export type ACFuncDeclInst = {
@@ -33,6 +34,8 @@ export type ACClosureDefInst = {
   envId: number,
   body: ACFuncBodyInst[]
 };
+
+export type ACValDeclInst = { inst: "val.decl", varName: string, ty: Type, modName: string };
 
 export type ACFuncBodyInst =
   ACRootTableInitInst | ACRootTableRegInst | ACRootTableUnregInst |

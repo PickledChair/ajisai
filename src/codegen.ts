@@ -1,3 +1,5 @@
+import { ACClosureDeclInst } from "./acir.ts";
+import { ACFuncDeclInst } from "./acir.ts";
 import {
   ACClosureMakeInst,
   ACModuleInst,
@@ -20,7 +22,8 @@ import {
   AstFuncNode,
   AstUnaryNode,
   AstLocalVarNode,
-  AstGlobalVarNode
+  AstGlobalVarNode,
+  AstDeclareNode
 } from "./ast.ts";
 import { ImportGraphNode } from "./import_graph.ts";
 
@@ -33,10 +36,10 @@ import {
 } from "./type.ts";
 
 type ModuleInitializer = { nodeType: "modInitializer", items: ModuleInitItem[], envId: number, rootTableSize: number };
-type ModuleInitItem = ExprStmtItem | ImportModItem;
+type ModuleInitItem = ExprStmtItem | ImportModItem | ValDefItem;
 type ExprStmtItem = { itemType: "exprStmt", expr: AstExprNode };
 type ImportModItem = { itemType: "importMod", modName: string };
-// type ValDefItem = { itemType: "valDef", def: AstDefNode  };
+type ValDefItem = { itemType: "valDef", declare: AstDeclareNode  };
 
 export class CodeGenerator {
   #importGraph: ImportGraphNode;
@@ -46,7 +49,7 @@ export class CodeGenerator {
   }
 
   codegen(): ACModuleInst {
-    let funcDecls: ACDeclInst[] = [];
+    let decls: ACDeclInst[] = [];
     let funcDefs: ACDefInst[] = [];
     let modInits: ACModInitDefInst[] = [];
 
@@ -54,14 +57,14 @@ export class CodeGenerator {
 
     for (const [asName, subImportGraph] of this.#importGraph.importMods.entries()) {
       const codeGen = new CodeGenerator(subImportGraph);
-      const { funcDecls: subFuncDecls, funcDefs: subFuncDefs, modInits: subModInits } = codeGen.codegen();
+      const { decls: subDecls, funcDefs: subFuncDefs, modInits: subModInits } = codeGen.codegen();
 
       modInitsNumMap.set(asName, {
         renamed: subImportGraph.modName.renamed,
         initsNum: subModInits.length,
       });
 
-      funcDecls = subFuncDecls.concat(funcDecls);
+      decls = subDecls.concat(decls);
       funcDefs = subFuncDefs.concat(funcDefs);
       modInits = subModInits.concat(modInits);
     }
@@ -102,8 +105,18 @@ export class CodeGenerator {
           item.declare.modName!
         );
         const [funcDecl, funcDef] = funcCodeGen.codegenFunc();
-        funcDecls.push(funcDecl);
+        decls.push(funcDecl);
         funcDefs.push(funcDef);
+      } else {
+        if (!tyEqual(item.declare.ty!, { tyKind: "primitive", name: "()"})) {
+          decls.push({
+            inst: "val.decl",
+            varName: item.declare.name,
+            ty: item.declare.ty!,
+            modName: item.declare.modName!,
+          });
+          modInitItems.push({ itemType: "valDef", declare: item.declare });
+        }
       }
     }
 
@@ -128,7 +141,7 @@ export class CodeGenerator {
       modInits.push(modInitCodeGen.codegenModInit());
     }
 
-    return { inst: "module", funcDecls, funcDefs, modInits, entryModName: this.#importGraph.modName.renamed };
+    return { inst: "module", decls, funcDefs, modInits, entryModName: this.#importGraph.modName.renamed };
   }
 }
 
@@ -223,7 +236,7 @@ class FuncCodeGenerator {
     ];
   }
 
-  private makeFuncDeclInst(): ACDeclInst {
+  private makeFuncDeclInst(): ACFuncDeclInst | ACClosureDeclInst {
     if (this.#funcNode.nodeType === "modInitializer")
       throw new Error("function expected, but module initializer found");
 
@@ -287,6 +300,20 @@ class FuncCodeGenerator {
     for (const item of this.#funcNode.items) {
       if (item.itemType === "importMod") {
         bodyInsts.push({ inst: "mod.init", modName: item.modName });
+        continue;
+      }
+
+      if (item.itemType === "valDef") {
+        const { prelude, valInst } = this.codegenExpr(item.declare.value);
+        if (prelude) bodyInsts = bodyInsts.concat(prelude);
+        if (valInst) {
+          bodyInsts.push({
+            inst: "mod_val.init",
+            varName: item.declare.name,
+            modName: item.declare.modName!,
+            value: valInst,
+          });
+        }
         continue;
       }
 
@@ -478,7 +505,7 @@ class FuncCodeGenerator {
         }
         throw new Error("unreachable");
       } else {
-        throw new Error("unimplemented for non-func def load");
+        return { valInst: { inst: "mod_defs.load", varName: ast.name, modName: ast.modName! } };
       }
     } else {
       throw new Error("unreachable");
