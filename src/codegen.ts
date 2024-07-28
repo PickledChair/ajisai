@@ -1,15 +1,16 @@
-import { ACClosureDeclInst, ACEntryInst } from "./acir.ts";
-import { ACFuncDeclInst } from "./acir.ts";
 import {
+  ACClosureDeclInst,
   ACClosureMakeInst,
-  ACModuleInst,
-  ACFuncBodyInst,
   ACDeclInst,
   ACDefInst,
+  ACEntryInst,
+  ACFuncBodyInst,
+  ACFuncDeclInst,
   ACFuncFrameDefTmpNoValInst,
-  ACPushValInst,
   ACModInitDefInst,
-  ACModInitBodyInst
+  ACModInitBodyInst,
+  ACModuleInst,
+  ACPushValInst
 } from "./acir.ts";
 
 import {
