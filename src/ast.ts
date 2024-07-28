@@ -9,7 +9,7 @@ export type AstNode =
   | AstDeclareNode
   | AstExprNode;
 
-export type AstModuleNode = { nodeType: "module", items: AstModuleItemNode[], envId: number, rootTableSize?: number };
+export type AstModuleNode = { nodeType: "module", items: AstModuleItemNode[], envId: number, rootTableSize?: number, globalRootTableSize?: number };
 export type AstModuleItemNode = AstDefNode | AstImportNode | AstExprStmtNode;
 
 export type AstDefNode = { nodeType: "def", declare: AstDeclareNode | AstModuleDeclareNode };
@@ -47,7 +47,7 @@ export type AstFuncArgNode = { nodeType: "funcArg", name: string, ty?: Type };
 
 export type AstLetNode = { nodeType: "let", declares: AstDeclareNode[], body: AstExprSeqNode, bodyTy?: Type, envId: number, rootIdx?: number, rootIndices?: number[] };
 
-export type AstDeclareNode = { nodeType: "declare", name: string, ty?: Type, value: AstExprNode, modName?: string };
+export type AstDeclareNode = { nodeType: "declare", name: string, ty?: Type, value: AstExprNode, modName?: string, globalRootIdx?: number };
 
 export type AstIfNode = { nodeType: "if", cond: AstExprNode, then: AstExprSeqNode, else: AstExprSeqNode, ty?: Type };
 

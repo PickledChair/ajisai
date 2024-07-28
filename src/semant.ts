@@ -171,17 +171,20 @@ const getType = (name: string, defTypeMap: DefTypeMap, builtins?: DefTypeMap): T
 };
 
 class SemanticAnalyzer {
+  clsId: number;
+  freshGlobalRootId: number;
   #builtins: DefTypeMap;
   #importGraph: ImportGraphNode;
-  #additional_defs: AstDefNode[] = [];
-  clsId: number;
   #defTypeMap: DefTypeMap;
+  #precedingDefTypeMap: DefTypeMap = new Map();
+  #additional_defs: AstDefNode[] = [];
   #inFuncDef = false;
 
   constructor(
     importGraph: ImportGraphNode,
     builtinDefTypeMap: DefTypeMap,
-    startClosureId?: number
+    startClosureId?: number,
+    startGlobalRootId?: number,
   ) {
     this.#builtins = builtinDefTypeMap;
     this.#importGraph = importGraph;
@@ -190,15 +193,30 @@ class SemanticAnalyzer {
     } else {
       this.clsId = 0;
     }
+    if (startGlobalRootId) {
+      this.freshGlobalRootId = startGlobalRootId;
+    } else {
+      this.freshGlobalRootId = 0;
+    }
     this.#defTypeMap = makeDefTypeMap(importGraph.mod);
+  }
+
+  private incGlobalRootId(): number {
+    return this.freshGlobalRootId++;
   }
 
   analyze(): ImportGraphNode {
     for (const [asName, importGraph] of this.#importGraph.importMods.entries()) {
       if (!importGraph.isAnalyzed) {
-        const analyzer = new SemanticAnalyzer(importGraph, this.#builtins, this.clsId);
+        const analyzer = new SemanticAnalyzer(
+          importGraph,
+          this.#builtins,
+          this.clsId,
+          this.freshGlobalRootId,
+        );
         const analyzedGraph = analyzer.analyze();
         this.clsId = analyzer.clsId;
+        this.freshGlobalRootId = analyzer.freshGlobalRootId;
         this.#importGraph.importMods.set(asName, analyzedGraph);
       }
     }
@@ -259,6 +277,7 @@ class SemanticAnalyzer {
       items,
       envId: modEnv.envId,
       rootTableSize: modEnv.rootTableSize,
+      globalRootTableSize: this.freshGlobalRootId,
     };
   }
 
@@ -272,6 +291,12 @@ class SemanticAnalyzer {
       this.#inFuncDef = false;
 
       if (tyEqual(ast.declare.ty, exprTy)) {
+        this.#precedingDefTypeMap.set(ast.declare.name, ast.declare.ty);
+
+        let globalRootIdx = undefined;
+        if (ast.declare.ty.tyKind !== "func" && mayBeHeapObj(ast.declare.ty)) {
+          globalRootIdx = this.incGlobalRootId();
+        }
         return {
           nodeType: "def",
           declare: {
@@ -279,7 +304,8 @@ class SemanticAnalyzer {
             name: ast.declare.name,
             ty: ast.declare.ty,
             value: exprNode,
-            modName: this.#importGraph.modName.renamed
+            modName: this.#importGraph.modName.renamed,
+            globalRootIdx,
           }
         };
       } else {
@@ -342,6 +368,21 @@ class SemanticAnalyzer {
       } else {
         const ty = getType(ast.name, this.#defTypeMap, this.#builtins);
         if (ty) {
+          // NOTE: 相互再帰を可能にするために、ある関数定義内で後ろに定義されている関数を呼び出すことを可能にしている。
+          //       一方、その他の型のモジュールレベル変数の初期化式内では、後方で定義されている変数へのアクセスや関数の呼び出しを
+          //       禁止する。これは特に変数どうしの初期化の順序関係に基づく制限である（変数の初期化式内で後ろにある関数を呼び出す
+          //       ことに関しては技術的な制限はないが、変数どうしの関係に一貫性を持たせるために同様に禁止している）。
+          //       この際、 関数 A とその後方で定義されている非関数型の変数 x があって、関数 A がその定義内で変数 x より後ろで
+          //       定義されている変数 y を参照しているとき、変数 x の初期化時に A の呼び出しが行われるとしたら、y を x より先に
+          //       初期化する必要が生じてしまい、x と y の初期化順序が原則に反してしまう。これを避けるために、ある関数内からその
+          //       後方で定義されている変数へのアクセスを禁止する。まとめると、次の２つの条件のどちらかを満たすとエラーとする：
+          //
+          //       - 非関数の変数の初期化式で、前方で定義されていない変数（関数を含む。組み込み関数は含まない）への参照がある
+          //       - 関数定義内で、前方で定義されていない変数（ただし関数および組み込み関数を含まない）への参照がある
+          if ((!this.#inFuncDef && this.#precedingDefTypeMap.get(ast.name) == null && this.#builtins.get(ast.name) == null)
+              || (this.#inFuncDef && ty.tyKind !== "func" && this.#precedingDefTypeMap.get(ast.name) == null && this.#builtins.get(ast.name) == null)) {
+            throw new Error(`variable '${ast.name}' is found, but not in preceding definitions.`);
+          }
           return [
             {
               nodeType: "globalVar",

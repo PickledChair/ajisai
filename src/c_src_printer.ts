@@ -1,9 +1,19 @@
-import { ACIfElseInst, ACModuleInst, ACFuncBodyInst, ACDeclInst, ACDefInst, ACPushValInst, ACModInitDefInst } from "./acir.ts";
+import {
+  ACIfElseInst,
+  ACFuncBodyInst,
+  ACDefInst,
+  ACPushValInst,
+  ACModInitDefInst,
+  ACFuncDeclInst,
+  ACClosureDeclInst,
+  ACValDeclInst,
+  ACEntryInst
+} from "./acir.ts";
 import { toCType } from "./type.ts";
 
 const defaultFileHeader = "#include <ajisai_runtime.h>\n\n";
 
-export const printCSrc = async (filePath: string, module: ACModuleInst) => {
+export const printCSrc = async (filePath: string, entry: ACEntryInst) => {
   const file = await Deno.open(filePath, { write: true, create: true, truncate: true });
   const writer = file.writable.getWriter();
 
@@ -12,32 +22,44 @@ export const printCSrc = async (filePath: string, module: ACModuleInst) => {
 
     await writer.write(encoder.encode(defaultFileHeader));
 
-    for (const funcDecl of module.funcDecls) {
-      await printProtoType(writer, encoder, funcDecl);
+    for (const decl of entry.entryMod.decls) {
+      if (decl.inst === "func.decl" || decl.inst === "closure.decl") {
+        await printProtoType(writer, encoder, decl);
+      } else {
+        await printGlovalVar(writer, encoder, decl);
+      }
     }
 
-    for (const modInit of module.modInits) {
+    for (const modInit of entry.entryMod.modInits) {
       await writer.write(encoder.encode(`void modinit__${modInit.modName}(AjisaiFuncFrame *parent_frame);\n`));
     }
 
-    for (const funcDef of module.funcDefs) {
+    if (entry.globalRootTableSize > 0) {
+      await writer.write(encoder.encode(`\nAjisaiObject *global_root_table[${entry.globalRootTableSize}] = {};\n`));
+    }
+
+    for (const funcDef of entry.entryMod.funcDefs) {
       await writer.write(encoder.encode("\n"));
       await printFuncDef(writer, encoder, funcDef);
     }
 
-    for (const modInit of module.modInits) {
+    for (const modInit of entry.entryMod.modInits) {
       await writer.write(encoder.encode("\n"));
       await printModInitDef(writer, encoder, modInit);
     }
 
     await writer.write(encoder.encode("\n"));
-    await printMain(writer, encoder, module.entryModName);
+    await printMain(writer, encoder, entry);
   } finally {
     file.close();
   }
 };
 
-const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, decl: ACDeclInst) => {
+const printProtoType = async (
+  writer: WritableStreamDefaultWriter,
+  encoder: TextEncoder,
+  decl: ACFuncDeclInst | ACClosureDeclInst,
+) => {
   let line = `${toCType(decl.resultType)} ${decl.inst === "func.decl" ? `userdef__${decl.modName}_` : "closure"}_${decl.funcName}(AjisaiFuncFrame *parent_frame`;
 
   for (const [argName, argTy] of decl.args) {
@@ -49,14 +71,32 @@ const printProtoType = async (writer: WritableStreamDefaultWriter, encoder: Text
   await writer.write(encoder.encode(line));
 };
 
-const printMain = async (writer: WritableStreamDefaultWriter, encoder: TextEncoder, entryModName: string) => {
+const printGlovalVar = async(
+  writer: WritableStreamDefaultWriter,
+  encoder: TextEncoder,
+  decl: ACValDeclInst,
+) => {
+  await writer.write(encoder.encode(`${toCType(decl.ty)} userdef__${decl.modName}__${decl.varName};\n`));
+}
+
+const printMain = async (
+  writer: WritableStreamDefaultWriter,
+  encoder: TextEncoder,
+  entry: ACEntryInst,
+) => {
   await writer.write(encoder.encode("int main() {\n"));
   await writer.write(encoder.encode("  AjisaiMemManager mem_manager;\n"));
   // TODO: メモリ確保に失敗した時に終了する処理を入れる
   await writer.write(encoder.encode("  ajisai_mem_manager_init(&mem_manager);\n"));
-  await writer.write(encoder.encode("  AjisaiFuncFrame func_frame = { .parent = NULL, .mem_manager = &mem_manager };\n"));
 
-  await writer.write(encoder.encode(`  modinit__${entryModName}(&func_frame);\n`));
+  let frameLine = `  AjisaiFuncFrame func_frame = { .parent = NULL, .mem_manager = &mem_manager, .root_table_size = ${entry.globalRootTableSize}`;
+  if (entry.globalRootTableSize > 0) {
+    frameLine += ", .root_table = global_root_table";
+  }
+  frameLine += " };\n";
+  await writer.write(encoder.encode(frameLine));
+
+  await writer.write(encoder.encode(`  modinit__${entry.entryMod.modName}(&func_frame);\n`));
 
   await writer.write(encoder.encode("  ajisai_mem_manager_deinit(&mem_manager);\n"));
   await writer.write(encoder.encode("  return 0;\n"));
@@ -71,6 +111,10 @@ const printModInitDef = async (writer: WritableStreamDefaultWriter, encoder: Tex
   for (const inst of modInit.body) {
     if (inst.inst === "mod.init") {
       await writer.write(encoder.encode(`  modinit__${inst.modName}(&func_frame);\n`));
+    } else if (inst.inst === "mod_val.init") {
+      await writer.write(encoder.encode(`  userdef__${inst.modName}__${inst.varName} = ${makePushValLiteral(inst.value)};\n`));
+    } else if (inst.inst === "global_root_table.reg") {
+      await writer.write(encoder.encode(`  global_root_table[${inst.idx}] = (AjisaiObject *)userdef__${inst.modName}__${inst.varName};\n`));
     } else {
       await printFuncBodyInst(writer, encoder, inst);
     }
