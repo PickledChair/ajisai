@@ -1,4 +1,4 @@
-import { ACClosureDeclInst } from "./acir.ts";
+import { ACClosureDeclInst, ACEntryInst } from "./acir.ts";
 import { ACFuncDeclInst } from "./acir.ts";
 import {
   ACClosureMakeInst,
@@ -48,7 +48,15 @@ export class CodeGenerator {
     this.#importGraph = importGraph;
   }
 
-  codegen(): ACModuleInst {
+  codegen(): ACEntryInst {
+    return {
+      inst: "entry",
+      entryMod: this.codegenModule(),
+      globalRootTableSize: this.#importGraph.mod.globalRootTableSize!,
+    };
+  }
+
+  private codegenModule(): ACModuleInst {
     let decls: ACDeclInst[] = [];
     let funcDefs: ACDefInst[] = [];
     let modInits: ACModInitDefInst[] = [];
@@ -57,7 +65,7 @@ export class CodeGenerator {
 
     for (const [asName, subImportGraph] of this.#importGraph.importMods.entries()) {
       const codeGen = new CodeGenerator(subImportGraph);
-      const { decls: subDecls, funcDefs: subFuncDefs, modInits: subModInits } = codeGen.codegen();
+      const { decls: subDecls, funcDefs: subFuncDefs, modInits: subModInits } = codeGen.codegenModule();
 
       modInitsNumMap.set(asName, {
         renamed: subImportGraph.modName.renamed,
@@ -141,7 +149,7 @@ export class CodeGenerator {
       modInits.push(modInitCodeGen.codegenModInit());
     }
 
-    return { inst: "module", decls, funcDefs, modInits, entryModName: this.#importGraph.modName.renamed };
+    return { inst: "module", decls, funcDefs, modInits, modName: this.#importGraph.modName.renamed };
   }
 }
 
@@ -313,6 +321,14 @@ class FuncCodeGenerator {
             modName: item.declare.modName!,
             value: valInst,
           });
+          if (item.declare.globalRootIdx != null) {
+            bodyInsts.push({
+              inst: "global_root_table.reg",
+              idx: item.declare.globalRootIdx,
+              varName: item.declare.name,
+              modName: item.declare.modName!,
+            });
+          }
         }
         continue;
       }

@@ -1,20 +1,21 @@
 import { FuncKind, Type } from "./type.ts";
 
+export type ACEntryInst = { inst: "entry", entryMod: ACModuleInst, globalRootTableSize: number };
 export type ACModuleInst = {
   inst: "module",
   decls: ACDeclInst[],
   funcDefs: ACDefInst[],
   modInits: ACModInitDefInst[],
-  entryModName: string,
+  modName: string,
 };
 
 export type ACDeclInst = ACFuncDeclInst | ACClosureDeclInst | ACValDeclInst;
 export type ACDefInst = ACFuncDefInst | ACClosureDefInst;
 
-// export type ACEntryInst = { inst: "entry", body: ACFuncBodyInst[] };
-export type ACModInitBodyInst = ACFuncBodyInst | ACModInitInst | ACModValInitInst;
+export type ACModInitBodyInst = ACFuncBodyInst | ACModInitInst | ACModValInitInst | ACGlobalRootTableRegInst;
 export type ACModInitInst = { inst: "mod.init", modName: string };
 export type ACModValInitInst = { inst: "mod_val.init", varName: string, modName: string, value: ACPushValInst };
+export type ACGlobalRootTableRegInst = { inst: "global_root_table.reg", idx: number, varName: string, modName: string };
 export type ACModInitDefInst = { inst: "mod_init.def" , body: ACModInitBodyInst[], modName: string };
 
 export type ACFuncDeclInst = {

@@ -171,17 +171,19 @@ const getType = (name: string, defTypeMap: DefTypeMap, builtins?: DefTypeMap): T
 };
 
 class SemanticAnalyzer {
+  clsId: number;
+  freshGlobalRootId: number;
   #builtins: DefTypeMap;
   #importGraph: ImportGraphNode;
-  #additional_defs: AstDefNode[] = [];
-  clsId: number;
   #defTypeMap: DefTypeMap;
+  #additional_defs: AstDefNode[] = [];
   #inFuncDef = false;
 
   constructor(
     importGraph: ImportGraphNode,
     builtinDefTypeMap: DefTypeMap,
-    startClosureId?: number
+    startClosureId?: number,
+    startGlobalRootId?: number,
   ) {
     this.#builtins = builtinDefTypeMap;
     this.#importGraph = importGraph;
@@ -190,15 +192,30 @@ class SemanticAnalyzer {
     } else {
       this.clsId = 0;
     }
+    if (startGlobalRootId) {
+      this.freshGlobalRootId = startGlobalRootId;
+    } else {
+      this.freshGlobalRootId = 0;
+    }
     this.#defTypeMap = makeDefTypeMap(importGraph.mod);
+  }
+
+  private incGlobalRootId(): number {
+    return this.freshGlobalRootId++;
   }
 
   analyze(): ImportGraphNode {
     for (const [asName, importGraph] of this.#importGraph.importMods.entries()) {
       if (!importGraph.isAnalyzed) {
-        const analyzer = new SemanticAnalyzer(importGraph, this.#builtins, this.clsId);
+        const analyzer = new SemanticAnalyzer(
+          importGraph,
+          this.#builtins,
+          this.clsId,
+          this.freshGlobalRootId,
+        );
         const analyzedGraph = analyzer.analyze();
         this.clsId = analyzer.clsId;
+        this.freshGlobalRootId = analyzer.freshGlobalRootId;
         this.#importGraph.importMods.set(asName, analyzedGraph);
       }
     }
@@ -259,6 +276,7 @@ class SemanticAnalyzer {
       items,
       envId: modEnv.envId,
       rootTableSize: modEnv.rootTableSize,
+      globalRootTableSize: this.freshGlobalRootId,
     };
   }
 
@@ -272,6 +290,10 @@ class SemanticAnalyzer {
       this.#inFuncDef = false;
 
       if (tyEqual(ast.declare.ty, exprTy)) {
+        let globalRootIdx = undefined;
+        if (ast.declare.ty.tyKind !== "func" && mayBeHeapObj(ast.declare.ty)) {
+          globalRootIdx = this.incGlobalRootId();
+        }
         return {
           nodeType: "def",
           declare: {
@@ -279,7 +301,8 @@ class SemanticAnalyzer {
             name: ast.declare.name,
             ty: ast.declare.ty,
             value: exprNode,
-            modName: this.#importGraph.modName.renamed
+            modName: this.#importGraph.modName.renamed,
+            globalRootIdx,
           }
         };
       } else {
