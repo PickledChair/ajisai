@@ -1,1 +1,1 @@
-fn() { println_str("hello!") }();
+fn() { println("hello!") }();

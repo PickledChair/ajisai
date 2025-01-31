@@ -3,7 +3,7 @@ func print_func_result(a: i32, b: i32, p: fn(i32, i32) -> i32) {
 }
 
 func get_sub_func() -> fn(i32, i32) -> i32 {
-    fn(a: i32, b: i32) -> i32 { a - b }
+    fn(a, b) { a - b }
 }
 
 func div_func(a: i32, b: i32) -> i32 {
@@ -14,8 +14,8 @@ func main() {
     let
         val a = 10
         val b = 5
-        func add(a: i32, b: i32) -> i32 { a + b }
-        func mul(a: i32, b: i32) -> i32 { a * b }
+        val add = fn(a, b) { a + b }
+        val mul = fn(a, b) { a * b }
     {
         print_func_result(a, b, add);
         print_func_result(a, b, get_sub_func());

@@ -1,5 +1,5 @@
 let val a = 2
-    val b = let { 3 + a }
+    val b = do { 3 + a }
 {
     println_i32(let val c = b * 3 { c + 10 })
 };

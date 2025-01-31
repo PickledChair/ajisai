@@ -7,11 +7,11 @@ func fizzbuzz_iter(cur: i32, end: i32) {
         ()
     } else {
         if cur % 15 == 0 {
-            println_str("FizzBuzz")
+            println("FizzBuzz")
         } else if cur % 3 == 0 {
-            println_str("Fizz")
+            println("Fizz")
         } else if cur % 5 == 0 {
-            println_str("Buzz")
+            println("Buzz")
         } else {
             println_i32(cur)
         };
