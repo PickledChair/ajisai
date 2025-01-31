@@ -1,5 +1,4 @@
 import AjisaiSemanticAnalyzer
-import AjisaiUtil
 
 enum ModuleInitItem {
     case exprStmt(expr: AjisaiExpr)
