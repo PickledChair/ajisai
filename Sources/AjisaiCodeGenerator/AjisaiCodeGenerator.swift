@@ -103,15 +103,9 @@ public final class AjisaiCodeGenerator {
     }
 }
 
-// struct EnvInfo {
-//     let envId: UInt
-//     let isFuncEnv: Bool
-// }
-
 final class FuncContext {
     let funcName: String
     var funcEnvId: UInt
-    // var envStack: [EnvInfo] = []
     var tmpId: UInt = 0
 
     var freshFuncTmpId: UInt {
@@ -122,29 +116,8 @@ final class FuncContext {
 
     init(funcName: String, envId: UInt) {
         self.funcName = funcName
-        // envStack.append(EnvInfo(envId: envId, isFuncEnv: true))
         self.funcEnvId = envId
     }
-
-    // func enterScope(envId: UInt) {
-    //     envStack.append(EnvInfo(envId: envId, isFuncEnv: false))
-    // }
-
-    // func leaveScope() {
-    //     _ = envStack.popLast()
-    // }
-
-    // var currentEnvId: UInt {
-    //     envStack.last!.envId
-    // }
-
-    // var currentEnvIsFunc: Bool {
-    //     envStack.last!.isFuncEnv
-    // }
-
-    // var funcEnvId: UInt {
-    //     envStack.first!.envId
-    // }
 }
 
 final class FuncCodeGenerator {
@@ -529,7 +502,6 @@ final class ExprCodeGenerator {
         switch calleeTy.followLink()! {
         case let .function(kind: funcKind, argTypes: argTypes, bodyType: bodyType):
             // NOTE: funcKind が .closure 以外でもクロージャとして呼び出されている場合がある
-            assert(funcKind != .undefined)
             var valInst: ACValueInst =
                 if calleeIsFuncLiteral || funcKind == .closure {
                     .closure_call(
@@ -573,9 +545,6 @@ final class ExprCodeGenerator {
                 return (prelude: nil, valInst: .modval_load(modName: modName, varName: varName))
             case .builtin:
                 return (prelude: nil, valInst: .builtin_load(name: varName))
-            case .undefined:
-                // unreachable
-                return (prelude: nil, valInst: nil)
             }
         default:
             return (prelude: nil, valInst: .modval_load(modName: modName, varName: varName))
@@ -618,8 +587,6 @@ final class ExprCodeGenerator {
 
         var prelude: [ACFuncBodyInst] = []
 
-        // funcCtx.enterScope(envId: envId)
-
         let funcEnvId = funcCtx.funcEnvId
         var returnVarTmpVarIdx: UInt? = nil
         if bodyTy.mayBeHeapObject() {
@@ -660,21 +627,9 @@ final class ExprCodeGenerator {
             prelude.append(contentsOf: bodyPrelude)
         }
 
-        // NOTE: bodyTy が unit なのに bodyValInst が nil でない場合があったのは、codegenExprSeq や
-        //       codegenCall の実装に問題があったからだと考えられる。
-        //       修正したので、以下はもう不要かも？
-        // var valInst: ACValueInst? = nil
-        // if bodyTy.tyEqual(to: .unit) && bodyValInst != nil {
-        //     prelude.append(.discard_value(bodyValInst!))
-        // } else {
-        //     valInst = bodyValInst
-        // }
-
         for idx in rootIndices {
             prelude.append(.roottable_unreg(rootTableIdx: idx))
         }
-
-        // funcCtx.leaveScope()
 
         if let tmpVarIdx = returnVarTmpVarIdx {
             prelude.append(

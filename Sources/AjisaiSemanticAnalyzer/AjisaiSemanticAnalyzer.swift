@@ -456,17 +456,6 @@ final class AjisaiSemanticAnalyzer {
                 funcArgs.append(AjisaiFuncArg(name: name, ty: varTy.ty))
             }
 
-            // FIXME
-            // モジュールレベルで記述されている関数式を全て .userdef と設定するのは誤り。
-            // 以下の例では add はクロージャオブジェクトに束縛されなければならない：
-            //
-            // func make_closure() -> fn(i32, i32) -> i32 {
-            //     fn(a, b) { a + b }
-            // }
-            // val add: fn(i32, i32) -> i32 = make_closure();
-            //
-            // func 文で定義しているか、val 文で定義しているかで条件分岐するのが最も簡単な
-            // 対応であると思われる。
             let funcKind: AjisaiFuncKind =
                 if parentEnv.envKind == .module && inFuncDef {
                     .userdef
@@ -532,7 +521,7 @@ final class AjisaiSemanticAnalyzer {
             case .failure(let error):
                 return .failure(error)
             case .success(let returnType):
-                // FIXME: returnType がまだ単一化され切っていない時、rootIdx が必要かどうかを
+                // NOTE: returnType がまだ単一化され切っていない時、rootIdx が必要かどうかを
                 // まだ判断できない
                 return .success(
                     (
@@ -566,7 +555,7 @@ final class AjisaiSemanticAnalyzer {
                 let paramTypes = (0..<argTypes.count).map { _ in newTVar(letLevel: level) }
                 let bodyType = newTVar(letLevel: level)
                 tvar.value = .link(
-                    ty: .function(kind: .undefined, argTypes: paramTypes, bodyType: bodyType))
+                    ty: .function(kind: .closure, argTypes: paramTypes, bodyType: bodyType))
 
                 for (paramType, argType) in zip(paramTypes, argTypes) {
                     switch paramType.unify(with: argType) {

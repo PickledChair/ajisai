@@ -6,11 +6,7 @@ public struct AjisaiModule: Equatable {
 }
 
 public enum AjisaiModuleItem: Equatable {
-    // case defNode(declare: AjisaiDeclare)
     case variableDeclare(AjisaiVariableDeclare)
-    // case moduleDeclare(
-    //     name: String,
-    //     mod: AjisaiModule)
     case importNode(asName: String)
     case exprStmtNode(expr: AjisaiExpr)
 }
@@ -22,18 +18,6 @@ public struct AjisaiVariableDeclare: Equatable {
     public let modName: String
     public let globalRootIdx: UInt?
 }
-
-// public enum AjisaiDeclare: Equatable {
-//     case variableDeclare(
-//         name: String,
-//         ty: AjisaiType,
-//         value: AjisaiExpr,
-//         modName: String,
-//         globalRootIdx: UInt?)
-//     case moduleDeclare(
-//         name: String,
-//         mod: AjisaiModule)
-// }
 
 public struct AjisaiFuncArg: Equatable {
     public let name: String
@@ -137,8 +121,6 @@ public enum AjisaiExpr: Equatable {
             ty
         case let .globalVarNode(name: _, modName: _, ty: ty):
             ty
-        // case let .pathNode(path):
-        //     path.ty
         case .unitNode:
             .unit
         }

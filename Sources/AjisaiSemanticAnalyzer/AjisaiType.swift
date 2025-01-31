@@ -241,7 +241,11 @@ public enum AjisaiType: Equatable {
 
             let bodyType1: AjisaiType = AjisaiType.from(typeNode: bodyType)
 
-            return .function(kind: .undefined, argTypes: argTypes1, bodyType: bodyType1)
+            // NOTE: 最も上層の関数の型は userdef と closure のどちらのラベルづけをすれば良いか
+            //       わからないが、関数の引数や戻り値に現れる関数の型は必ず closure のラベル付け
+            //       ができる。そこで、初期値として closure のラベルを採用し、userdef はそのように
+            //       ラベルづけができる時に後から明示的に付け替えるようにする、という方針とする。
+            return .function(kind: .closure, argTypes: argTypes1, bodyType: bodyType1)
         }
     }
 
@@ -354,5 +358,5 @@ public enum AjisaiType: Equatable {
 }
 
 public enum AjisaiFuncKind: Equatable {
-    case userdef, closure, builtin, undefined
+    case userdef, closure, builtin
 }

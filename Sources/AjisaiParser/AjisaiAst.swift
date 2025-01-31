@@ -179,15 +179,6 @@ public enum AjisaiPathNode {
         return span
     }
 
-    // public var ty: AjisaiTypeNode? {
-    //     switch self {
-    //     case let .pathEnd(name: _, modName: _, ty: ty, span: _):
-    //         return ty
-    //     case let .path(sup: _, sub: sub, supSpan: _):
-    //         return sub.ty
-    //     }
-    // }
-
     public func append(path: AjisaiPathNode) -> AjisaiPathNode {
         switch self {
         case let .pathEnd(name: supName, span: _):
