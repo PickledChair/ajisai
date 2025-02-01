@@ -1,3 +1,5 @@
+import Foundation
+
 public enum AjisaiParserError: Error, Equatable {
     case invalidElseClause(span: AjisaiSpan)
     case invalidPrimaryToken(got: AjisaiToken, span: AjisaiSpan)
@@ -1082,4 +1084,10 @@ public final class AjisaiParser {
             }
         }
     }
+}
+
+public func parseFile(srcURL: URL, srcContent: String) -> ParseResult<AjisaiModuleDeclareNode> {
+    let lexer = AjisaiLexer(srcURL: srcURL, srcContent: srcContent)
+    let parser = AjisaiParser(lexer: lexer)
+    return parser.parse()
 }

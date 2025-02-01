@@ -1,6 +1,7 @@
-import AjisaiParser
 import Foundation
 import Testing
+
+@testable import AjisaiParser
 
 struct AjisaiParserTest {
     // MARK: - Parsing Statements Test

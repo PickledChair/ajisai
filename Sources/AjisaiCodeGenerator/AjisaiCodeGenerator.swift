@@ -1,4 +1,5 @@
 import AjisaiSemanticAnalyzer
+import Foundation
 
 enum ModuleInitItem {
     case exprStmt(expr: AjisaiExpr)
@@ -725,4 +726,13 @@ final class ExprCodeGenerator {
             valInst: .tmp_load(envId: funcEnvId, index: tmpVarId)
         )
     }
+}
+
+public func codeGenerate<Target>(
+    analyzedAst: AjisaiImportGraphNode<AjisaiModule>, to target: inout Target
+)
+where Target: TextOutputStream {
+    let codeGenerator = AjisaiCodeGenerator(importGraph: analyzedAst)
+    let acProgram = codeGenerator.codegen()
+    writeCSource(program: acProgram, to: &target)
 }

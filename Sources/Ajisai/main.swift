@@ -39,19 +39,31 @@ struct Ajisai: ParsableCommand {
         }
 
         // 構文解析
-        let lexer = AjisaiLexer(srcURL: inputFileURL, srcContent: srcContent)
-        let parser = AjisaiParser(lexer: lexer)
-        let ast = try parser.parse().get()
+        let ast = try parseFile(srcURL: inputFileURL, srcContent: srcContent).get()
 
         // 意味解析
         let analyzedAst = try semanticAnalyze(modDeclare: ast).get()
 
-        // コード生成
-        let codeGenerator = AjisaiCodeGenerator(importGraph: analyzedAst)
-        let acProgram = codeGenerator.codegen()
-
         let destDirPath = "ajisai-out"
         let runtimePath = "runtime"
+        var fileOutputStream = try prepareDestFile(
+            destDirPath: destDirPath, runtimePath: runtimePath)
+
+        // コード生成（C のソースコードを出力）
+        codeGenerate(analyzedAst: analyzedAst, to: &fileOutputStream)
+
+        var outputFileURL = currentDirURL
+        var outputFileName = inputFileURL.lastPathComponent
+        outputFileName.removeLast(inputFileURL.pathExtension.count + 1)
+        outputFileURL.appendPathComponent(outputFileName)
+        let outputFilePath = outputFile ?? outputFileURL.path
+
+        // 出力した C ソースコードのコンパイル
+        cc(outputFilePath: outputFilePath, destDirPath: destDirPath, runtimePath: runtimePath)
+
+    }
+
+    func prepareDestFile(destDirPath: String, runtimePath: String) throws -> FileOutputStream {
         var destPathIsDir = ObjCBool(false)
         var destPathAlreadyExists = false
 
@@ -68,15 +80,10 @@ struct Ajisai: ParsableCommand {
         // ファイルを作成して書き込み
         FileManager.default.createFile(atPath: "\(destDirPath)/main.c", contents: nil)
         let fileHandle = FileHandle(forWritingAtPath: "\(destDirPath)/main.c")!
-        var fileOutputStream = FileOutputStream(fileHandle: fileHandle)
-        writeCSource(program: acProgram, to: &fileOutputStream)
+        return FileOutputStream(fileHandle: fileHandle)
+    }
 
-        var outputFileURL = currentDirURL
-        var outputFileName = inputFileURL.lastPathComponent
-        outputFileName.removeLast(inputFileURL.pathExtension.count + 1)
-        outputFileURL.appendPathComponent(outputFileName)
-        let outputFilePath = outputFile ?? outputFileURL.path
-
+    func cc(outputFilePath: String, destDirPath: String, runtimePath: String) {
         let cc = Process()
         cc.executableURL = URL(fileURLWithPath: "/usr/bin/cc")
         cc.arguments = [
@@ -100,5 +107,6 @@ struct Ajisai: ParsableCommand {
         if let err = String(data: stderrData, encoding: .utf8) {
             print(err, terminator: "", to: &stderrStream)
         }
+
     }
 }

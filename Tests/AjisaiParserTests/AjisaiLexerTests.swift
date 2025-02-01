@@ -1,6 +1,7 @@
-import AjisaiParser
 import Foundation
 import Testing
+
+@testable import AjisaiParser
 
 struct AjisaiLexerTest {
     func lexingTestTemplate(src: String, expected: [AjisaiToken]) {
