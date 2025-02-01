@@ -77,7 +77,6 @@ struct Ajisai: ParsableCommand {
             throw AjisaiError.dest_dir_path_is_file
         }
 
-        // ファイルを作成して書き込み
         FileManager.default.createFile(atPath: "\(destDirPath)/main.c", contents: nil)
         let fileHandle = FileHandle(forWritingAtPath: "\(destDirPath)/main.c")!
         return FileOutputStream(fileHandle: fileHandle)

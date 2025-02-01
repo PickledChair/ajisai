@@ -4,7 +4,6 @@ public enum AjisaiToken: Equatable, Sendable {
     case percent  // %
     case assign  // =
     case eq, neq, lt, le, gt, ge  // == != < <= > >=
-    case logand, logor, bang  // && || !
     case comma, colon, colon_colon, semicolon, pipe  // , : :: ; |
     case lparen, rparen, lbrace, rbrace  // ( ) { }
     case arrow  // ->
@@ -13,6 +12,7 @@ public enum AjisaiToken: Equatable, Sendable {
     case tru, fals  // true, false
     case as_, do_, els, fn, func_, if_  // as, do, else, fn, func, if
     case import_, let_, module, not, val  // import, let, module, not, val
+    case logand, logor, bang  // and or not
 
     // リテラル
     case ident(String)  // 識別子
