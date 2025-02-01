@@ -18,7 +18,7 @@ module a {
 
 module d {
     func hello() {
-        println_str("hello")
+        println("hello")
     }
 }
 

@@ -32,9 +32,9 @@ func main() {
     println_i32(arith::div(10, 5));
     println_i32(deep_thought::answer);
 
-    println_str(a1::hello);
-    println_str(a2::hello);
-    println_str(a3::hello);
+    println(a1::hello);
+    println(a2::hello);
+    println(a3::hello);
 }
 
 main();

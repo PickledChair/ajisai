@@ -470,12 +470,12 @@ void ajisai_println_bool(AjisaiFuncFrame *func_frame, bool value) {
   putchar('\n');
 }
 
-void ajisai_print_str(AjisaiFuncFrame *func_frame, AjisaiString *value) {
+void ajisai_print(AjisaiFuncFrame *func_frame, AjisaiString *value) {
   printf("%.*s", (int)value->len, value->value);
 }
 
-void ajisai_println_str(AjisaiFuncFrame *func_frame, AjisaiString *value) {
-  ajisai_print_str(func_frame, value);
+void ajisai_println(AjisaiFuncFrame *func_frame, AjisaiString *value) {
+  ajisai_print(func_frame, value);
   putchar('\n');
 }
 

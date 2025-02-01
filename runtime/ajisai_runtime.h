@@ -129,8 +129,8 @@ void ajisai_print_i32(AjisaiFuncFrame *func_frame, int32_t value);
 void ajisai_println_i32(AjisaiFuncFrame *func_frame, int32_t value);
 void ajisai_print_bool(AjisaiFuncFrame *func_frame, bool value);
 void ajisai_println_bool(AjisaiFuncFrame *func_frame, bool value);
-void ajisai_print_str(AjisaiFuncFrame *func_frame, AjisaiString *value);
-void ajisai_println_str(AjisaiFuncFrame *func_frame, AjisaiString *value);
+void ajisai_print(AjisaiFuncFrame *func_frame, AjisaiString *value);
+void ajisai_println(AjisaiFuncFrame *func_frame, AjisaiString *value);
 void ajisai_flush(AjisaiFuncFrame *func_frame);
 
 AjisaiTypeInfo *ajisai_str_type_info(void);

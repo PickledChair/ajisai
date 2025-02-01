@@ -3,8 +3,8 @@ func print_equal(src: str, value: str, count: i32, end: i32) {
         ()
     } else {
         let val repeated = str_repeat(src, count) {
-            print_str("count: "); println_i32(count);
-            print_str("\t\""); print_str(repeated); print_str("\" == \""); print_str(value); print_str("\": "); println_bool(str_equal(repeated, value))
+            print("count: "); println_i32(count);
+            print("\t\""); print(repeated); print("\" == \""); print(value); print("\": "); println_bool(repeated == value)
         };
         print_equal(src, value, count + 1, end)
     }

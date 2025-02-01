@@ -1,5 +1,5 @@
 func print_repeated_str(src: str, count: i32) {
-    println_str(str_slice(src, 0, count));
+    println(str_slice(src, 0, count));
     if count != 0 {
         print_repeated_str(src, count - 1)
     } else {

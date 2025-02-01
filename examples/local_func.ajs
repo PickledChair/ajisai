@@ -1,4 +1,4 @@
-let func concat(a: str, b: str) -> str { str_concat(a, b) }
+let func concat(a: str, b: str) -> str { a + b }
 {
-    println_str(concat("Hello, ", "world!"))
+    println(concat("Hello, ", "world!"))
 };

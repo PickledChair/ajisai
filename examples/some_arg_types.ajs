@@ -1,9 +1,0 @@
-func select_print(left: i32, right: i32, select_left: bool) {
-    if select_left {
-        println_i32(left)
-    } else {
-        println_i32(right)
-    }
-}
-
-select_print(1, 2, true);
