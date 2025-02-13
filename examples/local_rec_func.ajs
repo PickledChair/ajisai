@@ -1,0 +1,9 @@
+let func fib(n: i32) -> i32 {
+    if n == 0 or n == 1 {
+        1
+    } else {
+        fib(n - 1) + fib(n - 2)
+    }
+} {
+    println_i32(fib(10))
+};
