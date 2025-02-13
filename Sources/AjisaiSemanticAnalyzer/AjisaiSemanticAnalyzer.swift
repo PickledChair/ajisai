@@ -277,6 +277,30 @@ final class AjisaiSemanticAnalyzer {
             }
             // 再帰関数の解析のためにここで型情報を登録する
             precedingDefTypeMap[name] = varTy.ty
+        } else if varEnv.envKind == .let_ {
+            // ローカルの関数定義についても、再帰関数の解析のためにここで型情報を登録する
+            addFnVarType: switch value {
+            case let .fnExprNode(args: args, body: _, bodyTy: bodyTy, span: _):
+                var argTypes: [AjisaiType] = []
+                for arg in args {
+                    if let argTy = arg.ty {
+                        argTypes.append(AjisaiType.from(typeNode: argTy))
+                    } else {
+                        break addFnVarType
+                    }
+                }
+                let bodyType: AjisaiType =
+                    if let bodyTy = bodyTy {
+                        AjisaiType.from(typeNode: bodyTy)
+                    } else {
+                        .unit
+                    }
+                varEnv.addNewVarTy(
+                    name: name,
+                    ty: .function(kind: .closure, argTypes: argTypes, bodyType: bodyType))
+            default:
+                break
+            }
         }
 
         let result = analyzeExpr(letLevel: letLevel, expr: value, varEnv: varEnv)
