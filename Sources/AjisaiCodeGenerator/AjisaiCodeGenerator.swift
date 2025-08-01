@@ -249,9 +249,49 @@ final class ModInitCodeGenerator {
                     bodyInsts.append(contentsOf: prelude.map { inst in .func_body_inst(inst) })
                 }
                 if let valInst = valInst {
-                    bodyInsts.append(
-                        .modval_init(
-                            varName: declare.name, modName: declare.modName, value: valInst))
+                    switch declare.value.ty {
+                    case .function(kind: let funcKind, argTypes: _, bodyType: _):
+                        // モジュールレベルの関数の val 定義は funcKind が closure であるため、
+                        // 変数束縛した値が builtin または userdef の関数への変数だと、Cソースレベルで
+                        // 変数の型が AjisaiClosure * と C の関数ポインタとで不一致となるため、
+                        // .closure_make_static 命令を発行して束縛した変数の方の型に合わせるようにする
+                        if funcKind == .builtin || funcKind == .userdef {
+                            switch valInst {
+                            case let .modval_load(modName: modName, varName: varName):
+                                let (prelude1, valInst1) = exprCodegen.codegenStaticClosure(
+                                    name: varName, funcKind: funcKind, modName: modName)
+                                bodyInsts.append(
+                                    contentsOf: prelude1.map { inst in .func_body_inst(inst) })
+                                bodyInsts.append(
+                                    .modval_init(
+                                        varName: declare.name, modName: declare.modName,
+                                        value: valInst1))
+                            case let .builtin_load(name: varName):
+                                let (prelude1, valInst1) = exprCodegen.codegenStaticClosure(
+                                    name: varName, funcKind: funcKind, modName: modName)
+                                bodyInsts.append(
+                                    contentsOf: prelude1.map { inst in .func_body_inst(inst) })
+                                bodyInsts.append(
+                                    .modval_init(
+                                        varName: declare.name, modName: declare.modName,
+                                        value: valInst1))
+                            default:
+                                bodyInsts.append(
+                                    .modval_init(
+                                        varName: declare.name, modName: declare.modName,
+                                        value: valInst))
+                            }
+                        } else {
+                            bodyInsts.append(
+                                .modval_init(
+                                    varName: declare.name, modName: declare.modName,
+                                    value: valInst))
+                        }
+                    default:
+                        bodyInsts.append(
+                            .modval_init(
+                                varName: declare.name, modName: declare.modName, value: valInst))
+                    }
                     if let globalRootIdx = declare.globalRootIdx {
                         bodyInsts.append(
                             .global_roottable_reg(

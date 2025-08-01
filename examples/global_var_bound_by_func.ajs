@@ -13,3 +13,24 @@ val sub: fn(i32, i32) -> i32 = make_closure2();
 
 println_i32(add(1, 2));
 println_i32(sub(1, 2));
+
+module A {
+    func hello1() {
+        println("hello! (1)")
+    }
+
+    val hello2: fn() = fn() {
+        println("hello! (2)")
+    };
+}
+
+import A;
+
+val hello1: fn() = A::hello1;
+hello1();
+
+val hello2: fn() = A::hello2;
+hello2();
+
+val println1: fn(str) = println;
+println1("hello! (3)");
