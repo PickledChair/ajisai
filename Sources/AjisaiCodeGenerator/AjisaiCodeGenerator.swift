@@ -192,7 +192,7 @@ final class FuncCodeGenerator {
         }
         bodyInsts.append(.funcframe_init(rootTableSize: rootTableSize))
 
-        let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx, modName: modName)
+        let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx)
         let (prelude, valInst) = exprCodegen.codegen(expr: body)
 
         if let prelude = prelude {
@@ -243,15 +243,55 @@ final class ModInitCodeGenerator {
             case let .importMod(modName: modName1):
                 bodyInsts.append(.mod_init(modName: modName1))
             case let .valDef(declare: declare):
-                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx, modName: modName)
+                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx)
                 let (prelude, valInst) = exprCodegen.codegen(expr: declare.value)
                 if let prelude = prelude {
                     bodyInsts.append(contentsOf: prelude.map { inst in .func_body_inst(inst) })
                 }
                 if let valInst = valInst {
-                    bodyInsts.append(
-                        .modval_init(
-                            varName: declare.name, modName: declare.modName, value: valInst))
+                    switch declare.value.ty {
+                    case .function(kind: let funcKind, argTypes: _, bodyType: _):
+                        // モジュールレベルの関数の val 定義は funcKind が closure であるため、
+                        // 変数束縛した値が builtin または userdef の関数への変数だと、Cソースレベルで
+                        // 変数の型が AjisaiClosure * と C の関数ポインタとで不一致となるため、
+                        // .closure_make_static 命令を発行して束縛した変数の方の型に合わせるようにする
+                        if funcKind == .builtin || funcKind == .userdef {
+                            switch valInst {
+                            case let .modval_load(modName: modName, varName: varName):
+                                let (prelude1, valInst1) = exprCodegen.codegenStaticClosure(
+                                    name: varName, funcKind: funcKind, modName: modName)
+                                bodyInsts.append(
+                                    contentsOf: prelude1.map { inst in .func_body_inst(inst) })
+                                bodyInsts.append(
+                                    .modval_init(
+                                        varName: declare.name, modName: declare.modName,
+                                        value: valInst1))
+                            case let .builtin_load(name: varName):
+                                let (prelude1, valInst1) = exprCodegen.codegenStaticClosure(
+                                    name: varName, funcKind: funcKind, modName: modName)
+                                bodyInsts.append(
+                                    contentsOf: prelude1.map { inst in .func_body_inst(inst) })
+                                bodyInsts.append(
+                                    .modval_init(
+                                        varName: declare.name, modName: declare.modName,
+                                        value: valInst1))
+                            default:
+                                bodyInsts.append(
+                                    .modval_init(
+                                        varName: declare.name, modName: declare.modName,
+                                        value: valInst))
+                            }
+                        } else {
+                            bodyInsts.append(
+                                .modval_init(
+                                    varName: declare.name, modName: declare.modName,
+                                    value: valInst))
+                        }
+                    default:
+                        bodyInsts.append(
+                            .modval_init(
+                                varName: declare.name, modName: declare.modName, value: valInst))
+                    }
                     if let globalRootIdx = declare.globalRootIdx {
                         bodyInsts.append(
                             .global_roottable_reg(
@@ -260,7 +300,7 @@ final class ModInitCodeGenerator {
                     }
                 }
             case let .exprStmt(expr: expr):
-                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx, modName: modName)
+                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx)
                 let (prelude, valInst) = exprCodegen.codegen(expr: expr)
                 if let prelude = prelude {
                     bodyInsts.append(contentsOf: prelude.map { inst in .func_body_inst(inst) })
@@ -277,11 +317,9 @@ final class ModInitCodeGenerator {
 
 final class ExprCodeGenerator {
     let funcCtx: FuncContext
-    let modName: String
 
-    init(funcCtx: FuncContext, modName: String) {
+    init(funcCtx: FuncContext) {
         self.funcCtx = funcCtx
-        self.modName = modName
     }
 
     func codegen(expr: AjisaiExpr) -> (prelude: [ACFuncBodyInst]?, valInst: ACValueInst?) {
@@ -472,10 +510,10 @@ final class ExprCodeGenerator {
             }
 
             switch arg {
-            case let .globalVarNode(name: name, modName: _, ty: ty)
+            case let .globalVarNode(name: name, modName: modName, ty: ty)
             where ty.isFunc && ty.funcKind! != .closure:
                 let (staticClsPrelude, staticClsInst) = codegenStaticClosure(
-                    name: name, funcKind: ty.funcKind!)
+                    name: name, funcKind: ty.funcKind!, modName: modName)
                 prelude.append(contentsOf: staticClsPrelude)
                 argValInsts.append(staticClsInst)
             case _ where !arg.ty.tyEqual(to: .unit):
@@ -603,10 +641,10 @@ final class ExprCodeGenerator {
             }
 
             switch declare.value {
-            case let .globalVarNode(name: name, modName: _, ty: ty)
+            case let .globalVarNode(name: name, modName: modName, ty: ty)
             where ty.isFunc && ty.funcKind! != .closure:
                 let (staticClsPrelude, staticClsInst) = codegenStaticClosure(
-                    name: name, funcKind: ty.funcKind!)
+                    name: name, funcKind: ty.funcKind!, modName: modName)
                 prelude.append(contentsOf: staticClsPrelude)
                 prelude.append(
                     .envvar_def(
@@ -696,7 +734,7 @@ final class ExprCodeGenerator {
         )
     }
 
-    func codegenStaticClosure(name: String, funcKind: AjisaiFuncKind) -> (
+    func codegenStaticClosure(name: String, funcKind: AjisaiFuncKind, modName: String) -> (
         prelude: [ACFuncBodyInst], valInst: ACValueInst
     ) {
         let closureId = funcCtx.freshFuncTmpId
