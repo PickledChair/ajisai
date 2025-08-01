@@ -192,7 +192,7 @@ final class FuncCodeGenerator {
         }
         bodyInsts.append(.funcframe_init(rootTableSize: rootTableSize))
 
-        let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx, modName: modName)
+        let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx)
         let (prelude, valInst) = exprCodegen.codegen(expr: body)
 
         if let prelude = prelude {
@@ -243,7 +243,7 @@ final class ModInitCodeGenerator {
             case let .importMod(modName: modName1):
                 bodyInsts.append(.mod_init(modName: modName1))
             case let .valDef(declare: declare):
-                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx, modName: modName)
+                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx)
                 let (prelude, valInst) = exprCodegen.codegen(expr: declare.value)
                 if let prelude = prelude {
                     bodyInsts.append(contentsOf: prelude.map { inst in .func_body_inst(inst) })
@@ -260,7 +260,7 @@ final class ModInitCodeGenerator {
                     }
                 }
             case let .exprStmt(expr: expr):
-                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx, modName: modName)
+                let exprCodegen = ExprCodeGenerator(funcCtx: funcCtx)
                 let (prelude, valInst) = exprCodegen.codegen(expr: expr)
                 if let prelude = prelude {
                     bodyInsts.append(contentsOf: prelude.map { inst in .func_body_inst(inst) })
@@ -277,11 +277,9 @@ final class ModInitCodeGenerator {
 
 final class ExprCodeGenerator {
     let funcCtx: FuncContext
-    let modName: String
 
-    init(funcCtx: FuncContext, modName: String) {
+    init(funcCtx: FuncContext) {
         self.funcCtx = funcCtx
-        self.modName = modName
     }
 
     func codegen(expr: AjisaiExpr) -> (prelude: [ACFuncBodyInst]?, valInst: ACValueInst?) {
@@ -472,10 +470,10 @@ final class ExprCodeGenerator {
             }
 
             switch arg {
-            case let .globalVarNode(name: name, modName: _, ty: ty)
+            case let .globalVarNode(name: name, modName: modName, ty: ty)
             where ty.isFunc && ty.funcKind! != .closure:
                 let (staticClsPrelude, staticClsInst) = codegenStaticClosure(
-                    name: name, funcKind: ty.funcKind!)
+                    name: name, funcKind: ty.funcKind!, modName: modName)
                 prelude.append(contentsOf: staticClsPrelude)
                 argValInsts.append(staticClsInst)
             case _ where !arg.ty.tyEqual(to: .unit):
@@ -603,10 +601,10 @@ final class ExprCodeGenerator {
             }
 
             switch declare.value {
-            case let .globalVarNode(name: name, modName: _, ty: ty)
+            case let .globalVarNode(name: name, modName: modName, ty: ty)
             where ty.isFunc && ty.funcKind! != .closure:
                 let (staticClsPrelude, staticClsInst) = codegenStaticClosure(
-                    name: name, funcKind: ty.funcKind!)
+                    name: name, funcKind: ty.funcKind!, modName: modName)
                 prelude.append(contentsOf: staticClsPrelude)
                 prelude.append(
                     .envvar_def(
@@ -696,7 +694,7 @@ final class ExprCodeGenerator {
         )
     }
 
-    func codegenStaticClosure(name: String, funcKind: AjisaiFuncKind) -> (
+    func codegenStaticClosure(name: String, funcKind: AjisaiFuncKind, modName: String) -> (
         prelude: [ACFuncBodyInst], valInst: ACValueInst
     ) {
         let closureId = funcCtx.freshFuncTmpId

@@ -29,7 +29,9 @@ func main() {
     println_i32(arith::add(10, 5));
     println_i32(arith::sub(10, 5));
     println_i32(arith::mul(10, 5));
-    println_i32(arith::div(10, 5));
+    let val div = arith::div {
+        println_i32(div(10, 5))
+    };
     println_i32(deep_thought::answer);
 
     println(a1::hello);
