@@ -159,6 +159,8 @@ public final class AjisaiLexer {
             return .not
         case "or":
             return .logor
+        case "struct":
+            return .struct_
         case "val":
             return .val
         default:

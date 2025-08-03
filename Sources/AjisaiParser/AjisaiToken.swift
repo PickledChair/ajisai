@@ -12,7 +12,8 @@ public enum AjisaiToken: Equatable, Sendable {
     case tru, fals  // true, false
     case as_, do_, els, fn, func_, if_  // as, do, else, fn, func, if
     case import_, let_, module, not, val  // import, let, module, not, val
-    case logand, logor, bang  // and or not
+    case logand, logor, bang  // and or !
+    case struct_  // struct
 
     // リテラル
     case ident(String)  // 識別子

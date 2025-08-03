@@ -167,6 +167,20 @@ struct AjisaiParserTest {
         )
     }
 
+    @Test("parsing struct definition test")
+    func parsingStructDefTest() {
+        parseStmtTestTemplate(
+            src: "struct Hoge { a: i32, b: bool, }",
+            expected: AjisaiModuleNode(items: [
+                .structDefNode(
+                    structDeclare: AjisaiStructDeclareNode(
+                        name: "Hoge",
+                        fields: [
+                            (name: "a", ty: .i32, span: nil), (name: "b", ty: .bool, span: nil),
+                        ]))
+            ]))
+    }
+
     // MARK: - Parsing Expressions Test
 
     func parseExprTestTemplate(src: String, expected: AjisaiExprNode) {

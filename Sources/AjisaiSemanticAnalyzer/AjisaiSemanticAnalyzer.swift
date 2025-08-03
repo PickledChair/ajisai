@@ -185,6 +185,9 @@ final class AjisaiSemanticAnalyzer {
                 case let .success(result):
                     items.append(.exprStmtNode(expr: result.expr))
                 }
+            case .structDefNode(_):
+                // TODO
+                break
             }
         }
 

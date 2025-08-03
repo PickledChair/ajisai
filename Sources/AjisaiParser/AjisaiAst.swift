@@ -20,19 +20,22 @@ public enum AjisaiModuleItemNode {
     case funcNode(funcDef: AjisaiFuncDefNode)
     case importNode(path: AjisaiPathNode, asName: String? = nil, span: AjisaiSpan? = nil)
     case exprStmtNode(expr: AjisaiExprNode, span: AjisaiSpan? = nil)
+    case structDefNode(structDeclare: AjisaiStructDeclareNode)
 
     public var span: AjisaiSpan? {
         return switch self {
         case let .moduleNode(moduleDeclare: _, span: span):
             span
-        case let .valNode(declare: declare):
+        case let .valNode(declare):
             declare.span
-        case let .funcNode(funcDef: funcDef):
+        case let .funcNode(funcDef):
             funcDef.span
         case let .importNode(path: _, asName: _, span: span):
             span
         case let .exprStmtNode(expr: _, span: span):
             span
+        case let .structDefNode(structDeclare):
+            structDeclare.span
         }
     }
 }
@@ -56,9 +59,40 @@ extension AjisaiModuleItemNode: Equatable {
             lpath == rpath && lasName == rasName
         case let (.exprStmtNode(expr: lexpr, span: _), .exprStmtNode(expr: rexpr, span: _)):
             lexpr == rexpr
+        case let (.structDefNode(structDec1), .structDefNode(structDec2)):
+            structDec1 == structDec2
         default:
             false
         }
+    }
+}
+
+public struct AjisaiStructDeclareNode {
+    public let name: String
+    public let fields: [(name: String, ty: AjisaiTypeNode, span: AjisaiSpan?)]
+    public let span: AjisaiSpan?
+
+    public init(
+        name: String, fields: [(name: String, ty: AjisaiTypeNode, span: AjisaiSpan?)],
+        span: AjisaiSpan? = nil
+    ) {
+        self.name = name
+        self.fields = fields
+        self.span = span
+    }
+}
+
+extension AjisaiStructDeclareNode: Equatable {
+    public static func == (lhs: AjisaiStructDeclareNode, rhs: AjisaiStructDeclareNode) -> Bool {
+        guard lhs.name == rhs.name else {
+            return false
+        }
+        for ((name1, ty1, _), (name2, ty2, _)) in zip(lhs.fields, rhs.fields) {
+            guard name1 == name2 && ty1.tyEqual(to: ty2) else {
+                return false
+            }
+        }
+        return true
     }
 }
 

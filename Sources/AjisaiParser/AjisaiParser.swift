@@ -37,6 +37,18 @@ public final class AjisaiParser {
                 break
             }
 
+            // struct definition
+            if let struct_ = eat(.struct_) {
+                switch parseStruct(startSpan: struct_.span) {
+                case let .success(structDec):
+                    endSpan = structDec.span
+                    items.append(.structDefNode(structDeclare: structDec))
+                case let .failure(error):
+                    return .failure(error)
+                }
+                continue
+            }
+
             // module-level variable definition
             if let val = eat(.val) {
                 switch parseValDef(startSpan: val.span) {
@@ -133,6 +145,43 @@ public final class AjisaiParser {
             AjisaiModuleNode(
                 items: items,
                 span: startSpan != nil && endSpan != nil ? startSpan!.merge(with: endSpan!) : nil))
+    }
+
+    func parseStruct(startSpan: AjisaiSpan) -> ParseResult<AjisaiStructDeclareNode> {
+        expect(.ident("")).flatMap {
+            guard case let .ident(structName) = $0.token else {
+                return .failure(.unreachable)
+            }
+            if case let .failure(error) = expect(.lbrace) {
+                return .failure(error)
+            }
+            var fields: [(name: String, ty: AjisaiTypeNode, span: AjisaiSpan?)] = []
+            while let field = eat(.ident("")) {
+                guard case let .ident(fieldName) = field.token else {
+                    return .failure(.unreachable)
+                }
+                if case let .failure(error) = expect(.colon) {
+                    return .failure(error)
+                }
+                switch parseType() {
+                case let .failure(error):
+                    return .failure(error)
+                case let .success(ty):
+                    fields.append((name: fieldName, ty: ty, span: field.span))
+                }
+                if eat(.comma) == nil {
+                    break
+                }
+            }
+            switch expect(.rbrace) {
+            case let .failure(error):
+                return .failure(error)
+            case let .success((_, span)):
+                return .success(
+                    AjisaiStructDeclareNode(
+                        name: structName, fields: fields, span: $0.span.merge(with: span)))
+            }
+        }
     }
 
     func parseValDef(startSpan: AjisaiSpan) -> ParseResult<AjisaiTypedVariableDeclareNode> {
